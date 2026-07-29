@@ -1,0 +1,22 @@
+<!--
+  COMPONENT: chat-launcher
+  Purpose: Floating "Ask me anything!" pill in the bottom-right corner. Click → opens the chat panel.
+  Alpine scope expected: chatOpen boolean.
+  Usage: paste once near </body>. Hidden while panel is open.
+  Auth note: works only in Mode 2 (deployed app, cookie auth). Hide entirely when Mode 1 / X-App-Token.
+-->
+<button @click="chatOpen = true"
+        x-show="!chatOpen && dataSource === 'real'"
+        x-transition.opacity
+        class="fixed bottom-4 right-4 z-30 flex items-center gap-2 pl-2 pr-4 py-2 rounded-full bg-[var(--surface-elevated)] border border-[var(--border)] shadow-lg hover:shadow-xl hover:border-[var(--primary)] transition-all group"
+        aria-label="Open chat">
+  <!-- Mascot -->
+  <span class="w-8 h-8 rounded-full bg-gradient-to-br from-[var(--chart-5)] to-[var(--primary)] flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+      <circle cx="9" cy="10" r="0.5" fill="white"/>
+      <circle cx="15" cy="10" r="0.5" fill="white"/>
+    </svg>
+  </span>
+  <span class="text-sm font-semibold text-[var(--foreground)]">ask me anything!</span>
+</button>

@@ -1,0 +1,36 @@
+<!--
+  COMPONENT: chart-card
+  Purpose: Standard chart card — title + optional subtitle + 3-icon chrome + ECharts container + drill row below.
+  Alpine scope expected: a chart object { title, subtitle?, data, field? (drill dimension) } + a render method in app() factory.
+  Usage: paste inline or inside an x-for. Wire the x-init to your renderFn($refs.X, chart).
+-->
+<div class="bg-[var(--surface-elevated)] border border-[var(--border)] rounded-xl shadow-sm">
+  <div class="flex items-center justify-between p-4 pb-2">
+    <div>
+      <h2 class="text-sm font-semibold" x-text="chart.title"></h2>
+      <p class="text-xs text-[var(--muted-foreground)] mt-0.5" x-text="chart.subtitle"></p>
+    </div>
+    <div class="flex items-center gap-0.5">
+      <button class="w-7 h-7 rounded flex items-center justify-center text-[var(--muted-foreground)] hover:text-[var(--primary)] hover:bg-[var(--surface)]" title="Filter">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+      </button>
+      <button class="w-7 h-7 rounded flex items-center justify-center text-[var(--muted-foreground)] hover:text-[var(--primary)] hover:bg-[var(--surface)]" title="Info">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- ECharts container -->
+  <div x-ref="chartEl" x-init="renderChart($refs.chartEl, chart)" class="w-full h-[320px] px-2"></div>
+
+  <!-- Drill row (4th drill affordance — see DESIGN.md §Drill UX) -->
+  <template x-if="chart.field && chart.data && chart.data.length > 0">
+    <div class="px-4 py-2 border-t border-[var(--border-subtle)] flex flex-wrap gap-1.5">
+      <template x-for="row in chart.data.slice(0, 8)" :key="row.label">
+        <button @click="drill(chart.field, row.label)" class="text-[10px] px-1.5 py-0.5 rounded border border-[var(--border)] text-[var(--muted-foreground)] hover:text-[var(--primary)] hover:border-[var(--primary)]">
+          <span class="text-[var(--primary)]">▶</span> <span x-text="row.label"></span>
+        </button>
+      </template>
+    </div>
+  </template>
+</div>

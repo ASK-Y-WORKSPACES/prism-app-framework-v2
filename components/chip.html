@@ -1,0 +1,32 @@
+<!--
+  COMPONENT: chip
+  Purpose: A single filter rule chip. Left stripe per scope (chip-stripe-{global|widget|drill|chat}).
+  Body click → reopens slicer. × → removes rule. Right-click → toggles lock (chip becomes solid + lock icon).
+  Alpine scope expected: r (rule object), scope ('global'|'widget'|'drill'|'chat'), slicerLabels{}, plus methods addSlicer, removeFilter, toggleLock.
+  Usage: inside a chip row, in a template x-for over filters[scope].
+-->
+<span :class="'chip-stripe-' + scope + (r.locked ? ' bg-[var(--primary-light)]' : '')"
+      class="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs bg-[var(--surface-elevated)] border border-[var(--border)] cursor-pointer"
+      @click="addSlicer(r.field, scope)"
+      @contextmenu.prevent="toggleLock(scope, r.field, widgetId)">
+  <span class="font-medium" x-text="(slicerLabels[r.field] && slicerLabels[r.field].label) || r.field"></span>
+
+  <!-- Display formatter -->
+  <span class="text-[var(--muted-foreground)]" x-text="
+    r.op === 'in'      ? ': ' + r.values.slice(0,2).join(', ') + (r.values.length > 2 ? ' (+' + (r.values.length - 2) + ')' : '') :
+    r.op === 'not_in'  ? ' ≠ ' + r.values.slice(0,2).join(', ') :
+    r.op === 'between' ? ': ' + r.values[0] + ' – ' + r.values[1] :
+    r.op === 'gte'     ? ' ≥ ' + r.values[0] :
+    r.op === 'lte'     ? ' ≤ ' + r.values[0] :
+    ''
+  "></span>
+
+  <!-- Lock icon (visible when r.locked) -->
+  <svg x-show="r.locked" width="10" height="10" viewBox="0 0 24 24" fill="currentColor" class="text-[var(--primary)]">
+    <path d="M12 1a5 5 0 0 1 5 5v4h1a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V12a2 2 0 0 1 2-2h1V6a5 5 0 0 1 5-5zm0 2a3 3 0 0 0-3 3v4h6V6a3 3 0 0 0-3-3z"/>
+  </svg>
+
+  <button @click.stop="removeFilter(scope, r.field, widgetId, r.op)" class="text-[var(--muted-foreground)] hover:text-[var(--negative)]">
+    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+  </button>
+</span>

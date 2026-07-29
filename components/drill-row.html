@@ -1,0 +1,17 @@
+<!--
+  COMPONENT: drill-row
+  Purpose: Per-chart drill pill row — the 4th of the 4 drill affordances (after dblclick, axis label, ▶ prefix).
+  Single-click drills (DOM event, never flaky like ECharts events on small bars).
+  Alpine scope expected: chart.data (array of {label, ...}), chart.field, drill(field, value) method.
+-->
+<div class="px-4 py-2 border-t border-[var(--border-subtle)] flex flex-wrap gap-1.5"
+     x-show="chart.field && chart.data && chart.data.length > 0">
+  <template x-for="row in chart.data.slice(0, 8)" :key="row.label">
+    <button @click="row.label !== 'Other' && drill(chart.field, row.label)"
+            :disabled="row.label === 'Other'"
+            class="text-[10px] px-1.5 py-0.5 rounded border border-[var(--border)] text-[var(--muted-foreground)] hover:text-[var(--primary)] hover:border-[var(--primary)] disabled:opacity-50 disabled:cursor-not-allowed">
+      <span class="text-[var(--primary)]" x-show="row.label !== 'Other'">▶</span>
+      <span x-text="row.label"></span>
+    </button>
+  </template>
+</div>

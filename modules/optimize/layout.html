@@ -1,0 +1,360 @@
+      <!-- optimize layout v2 — the guided operator loop (OPTIMIZE_MODULE_SPEC.md):
+           01 suggested actions → 02 recommendations → 03 pending changes (review & send) →
+           04 campaigns ⇄ 05 campaign editor → 06 history & results.
+           Governing rules: this app STAGES, platforms PUBLISH · nothing commits silently · every send opens a receipt.
+           Every section headline carries an ⓘ tooltip so a first-time user can follow the flow top-to-bottom. -->
+      <template x-if="sec.layout==='optimize'">
+        <div class="space-y-5">
+
+          <!-- Governance banner + per-platform connection badges -->
+          <div class="rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] p-3 flex flex-wrap items-center gap-2">
+            <span style="color:var(--chip-widget)" x-html="icon('optimize')"></span>
+            <span class="text-sm font-semibold">Optimize</span>
+            <span class="text-xs text-[var(--muted-foreground)]">🔒 <span class="font-semibold text-[var(--foreground)]">nothing changes without your review</span> — connected platforms are updated <span class="font-semibold text-[var(--foreground)]">directly through their API</span>; not-connected ones open in the platform for you to finish</span>
+            <div class="flex-1"></div>
+            <!-- honest per-source badges: green "live" ONLY with a real API gateway; a Prism-table-only
+                 source shows when its DATA was last updated instead (max date in the raw rows) -->
+            <template x-for="s in opt.sources" :key="s">
+              <span class="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2 py-1 rounded-full"
+                :class="optSourceConnected(s) ? 'bg-[var(--positive-light)] text-[var(--positive)]' : 'bg-[var(--surface)] text-[var(--muted-foreground)]'"
+                :title="optSourceConnected(s) ? (s+' is connected through its API — live, and this app can place changes there for your approval') : (s+' has no API connection — read from Prism tables, shown as of the last data update; changes open in the platform for you to make yourself')">
+                <span class="w-1.5 h-1.5 rounded-full" :class="optSourceConnected(s) ? 'bg-[var(--positive)]' : 'bg-[var(--muted-foreground)]'"></span>
+                <span x-text="optSourceConnected(s) ? (s+' · live via API') : (s+' · '+(optSrcFresh(s)||'read-only data'))"></span>
+              </span>
+            </template>
+          </div>
+
+          <!-- KPI strip -->
+          <div class="grid grid-cols-2 lg:grid-cols-5 gap-3">
+            <template x-for="(k,ki) in (sec._optKpis||[])" :key="ki">
+              <div class="bg-[var(--surface-elevated)] border border-[var(--border)] rounded-xl shadow-sm p-3">
+                <div class="flex items-center justify-between mb-1">
+                  <span class="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)]" x-text="k.label"></span>
+                  <button class="text-[var(--muted-foreground)] hover:text-[var(--primary)]" @mouseenter="showTip($event, optTipHtml(k.label, k.tip))" @mousemove="moveTip($event)" @mouseleave="hideTip()" x-html="icon('info')"></button>
+                </div>
+                <div class="text-xl font-bold tabular-nums" :title="k.exact||''" x-text="k.val"></div>
+              </div>
+            </template>
+          </div>
+
+          <!-- ░░ 01 · SUGGESTED ACTIONS — one-click actions built from the data. No input, no questions, no thread:
+               clicking a chip drafts into the Campaign editor and confirms with a toast. ░░ -->
+          <section class="rounded-xl border border-[var(--primary)] bg-[var(--surface-elevated)] p-3 space-y-2">
+            <div class="flex items-center gap-2 cursor-pointer select-none" @click="optToggleSec('assistant')">
+              <span class="text-[var(--muted-foreground)]" x-text="opt.collapsed.assistant?'▸':'▾'"></span>
+              <span class="text-[10px] font-semibold uppercase tracking-wider text-[var(--primary)]">01 · Suggested actions</span>
+              <button class="text-[var(--muted-foreground)] hover:text-[var(--primary)]" @click.stop
+                @mouseenter="showTip($event, optTipHtml('01 · Suggested actions', 'One-click actions built from your data. Clicking one drafts the edits into the Campaign editor for your review — nothing is sent automatically.'))"
+                @mousemove="moveTip($event)" @mouseleave="hideTip()" x-html="icon('info')"></button>
+              <div class="flex-1"></div>
+            </div>
+            <div x-show="!opt.collapsed.assistant" x-transition class="flex flex-wrap gap-1.5">
+              <template x-for="c in optConChips()" :key="c">
+                <button @click="optConSend(c)" class="text-[11px] px-2 py-1 rounded-full border border-[var(--primary)] text-[var(--primary)] bg-[var(--primary-light)] hover:opacity-80" x-text="c"></button>
+              </template>
+              <span x-show="optConChips().length===0" class="text-xs text-[var(--muted-foreground)] py-1">No suggested actions right now — everything sits near your account averages. New ones appear as the data changes.</span>
+            </div>
+          </section>
+
+          <!-- ░░ 02 · RECOMMENDATIONS — suggested fixes, ranked by impact; queueing adds them to Pending changes ░░ -->
+          <section class="rounded-xl border-2 bg-[var(--surface-elevated)] p-4" style="border-color:var(--chip-widget)">
+            <div class="flex flex-wrap items-center gap-2 cursor-pointer select-none" :class="opt.collapsed.recs?'':'mb-3'" @click="optToggleSec('recs')">
+              <span class="text-[var(--muted-foreground)]" x-text="opt.collapsed.recs?'▸':'▾'"></span>
+              <span class="text-[10px] font-semibold uppercase tracking-wider" style="color:var(--chip-widget)">02 · Recommendations</span>
+              <button class="text-[var(--muted-foreground)] hover:text-[var(--primary)]" @click.stop
+                @mouseenter="showTip($event, optTipHtml('02 · Recommendations', 'Fixes the agent found in your data, ranked by impact. “Queue fix” adds them to Pending changes for review; “Dismiss” hides one and asks why.'))"
+                @mousemove="moveTip($event)" @mouseleave="hideTip()" x-html="icon('info')"></button>
+              <span x-show="opt.collapsed.recs" class="text-xs text-[var(--muted-foreground)] tabular-nums" x-text="opt.recs.length+' open'"></span>
+              <!-- visible memory: muted rule types (persisted per browser) + restore for dismissed one-offs -->
+              <template x-for="k in Object.keys(opt.muted)" :key="k">
+                <button @click.stop="optUnmute(k)" class="text-[10px] font-semibold px-1.5 py-0.5 rounded border border-[var(--border)] text-[var(--muted-foreground)] hover:border-[var(--primary)] hover:text-[var(--primary)]"
+                  :title="'You dismissed these as against your strategy, so they’re no longer suggested — click to turn them back on'"
+                  x-text="optKindLabel(k)+' muted ✕'"></button>
+              </template>
+              <button x-show="optDismissedCount()" @click.stop="optRestoreDismissed()" class="text-[10px] text-[var(--muted-foreground)] hover:text-[var(--primary)] hover:underline"
+                x-text="optDismissedCount()+' dismissed · restore'"></button>
+              <div class="flex-1"></div>
+              <label class="flex items-center gap-1.5 text-xs text-[var(--muted-foreground)] cursor-pointer" @click.stop title="New recommendations queue themselves in Pending changes — you still review before anything is sent">
+                <input type="checkbox" x-model="opt.autoStage" class="accent-[var(--positive)]">
+                <span>Auto-queue new recommendations</span>
+              </label>
+            </div>
+            <div x-show="!opt.collapsed.recs" x-transition>
+            <div class="grid gap-3" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr))">
+              <template x-for="r in opt.recs" :key="r.id">
+                <div class="rounded-lg border border-[var(--border)] p-3 flex flex-col gap-1.5 bg-[var(--background)]">
+                  <div class="flex items-center gap-2">
+                    <span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded" :class="recBadge(r)" x-text="r.sev"></span>
+                    <span class="text-[10px] text-[var(--muted-foreground)] uppercase tracking-wider" x-text="r.source"></span>
+                  </div>
+                  <div class="text-sm font-semibold leading-snug" x-text="r.title"></div>
+                  <div class="text-xs text-[var(--muted-foreground)]" x-text="r.why"></div>
+                  <div class="text-xs italic" style="color:var(--chip-widget)" x-text="r.impact"></div>
+                  <div class="flex items-center gap-1.5 mt-1">
+                    <button @click="optStageRec(r)" title="Adds this fix to Pending changes (03) for your review — nothing is sent yet" class="text-xs px-2.5 py-1 rounded-lg bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white font-medium">Queue fix</button>
+                    <button @click="optDismissOpen(r)" class="text-xs px-2 py-1 rounded-lg text-[var(--muted-foreground)] hover:text-[var(--foreground)]">Dismiss</button>
+                    <span class="flex-1"></span>
+                    <span class="text-[10px] text-[var(--muted-foreground)] tabular-nums" title="How often this type of suggestion turned out right, based on past results" x-text="r.conf"></span>
+                  </div>
+                </div>
+              </template>
+            </div>
+            <div x-show="opt.recs.length===0" class="text-xs text-[var(--muted-foreground)] py-3">All recommendations handled — new ones arrive with tomorrow’s data.</div>
+            </div>
+          </section>
+
+          <!-- ░░ 03 · PENDING CHANGES — the review queue; every change waits here before it can be sent ░░ -->
+          <section class="rounded-xl border-2 border-[var(--warning)] bg-[var(--surface-elevated)] overflow-hidden">
+            <button @click="opt.stagingOpen=!opt.stagingOpen" class="w-full flex flex-wrap items-center gap-2 p-3 text-left" :style="optDrafts().length?'background:var(--warning-light)':''">
+              <span class="text-[var(--muted-foreground)]" x-text="opt.stagingOpen?'▾':'▸'"></span>
+              <span class="text-[10px] font-semibold uppercase tracking-wider text-[var(--warning)]">03 · Pending changes</span>
+              <span class="text-[var(--muted-foreground)] hover:text-[var(--primary)] cursor-help" @click.stop
+                @mouseenter="showTip($event, optTipHtml('03 · Pending changes', 'Every change waits here for your review — edit or remove anything before it goes out. “Send” pushes it to the ad platform.'))"
+                @mousemove="moveTip($event)" @mouseleave="hideTip()" x-html="icon('info')"></span>
+              <span x-show="opt.batches.length" class="text-xs text-[var(--muted-foreground)] tabular-nums"
+                x-text="optDraftChanges()+' change'+(optDraftChanges()===1?'':'s')+' in '+optDrafts().length+' batch'+(optDrafts().length===1?'':'es')+' · '+optAwaiting()+' awaiting your approval'"></span>
+              <div class="flex-1"></div>
+              <button x-show="optDrafts().length" @click.stop="optSendAll()" class="text-xs px-3 py-1.5 rounded-lg bg-[var(--positive)] hover:opacity-90 text-white font-medium">Send all to platforms ↗</button>
+            </button>
+            <div x-show="opt.stagingOpen" x-transition class="border-t border-[var(--border)] p-3 space-y-3">
+              <p class="text-[11px] text-[var(--muted-foreground)]">Everything below is a draft — <span class="font-medium text-[var(--foreground)]">nothing reaches a platform until you press Send</span>. Connected platforms are updated through their API; not-connected ones open for you to make the change yourself.</p>
+              <template x-for="b in optStagingList()" :key="b.id">
+                <div class="rounded-lg border p-3 space-y-2" :class="b.status==='draft'?'border-[var(--border)]':'border-[var(--positive)]'">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded" :class="optSrcBadge(b.source)" title="Where this batch came from" x-text="optSrcLabel(b.source)"></span>
+                    <span class="text-sm font-medium" x-text="b.title"></span>
+                    <span class="text-[11px] text-[var(--muted-foreground)] tabular-nums" x-text="b.createdAt+' · '+b.changes.length+' change'+(b.changes.length===1?'':'s')"></span>
+                    <div class="flex-1"></div>
+                    <template x-if="b.status==='draft'">
+                      <div class="flex gap-1.5">
+                        <button @click="optRemoveBatch(b)" class="text-xs px-2.5 py-1 rounded-lg border border-[var(--negative)] text-[var(--negative)] hover:bg-[var(--negative-light)]">Remove</button>
+                        <button @click="optSend(b)"
+                          :title="optBatchAllManual(b) ? 'No API connection — opens the platform so you can sign in and make the change yourself' : 'Connected platforms are updated through their API (a paused draft you approve there); any not-connected platform opens for you to make the change yourself'"
+                          class="text-xs px-2.5 py-1 rounded-lg bg-[var(--positive)] hover:opacity-90 text-white font-medium"
+                          x-text="optBatchAllManual(b) ? 'Open platform to apply ↗' : 'Send to platform ↗'"></button>
+                      </div>
+                    </template>
+                    <template x-if="b.status==='platform_staged'">
+                      <span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[var(--warning-light)] text-[var(--warning)]" title="Sent — the changes sit as a paused draft inside the platform until you approve them there">Awaiting your approval in the platform</span>
+                    </template>
+                  </div>
+                  <table class="w-full text-xs">
+                    <thead><tr class="border-b border-[var(--border-subtle)] text-[10px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">
+                      <th class="w-6"></th><th class="text-left px-2 py-1">Campaign</th><th class="text-left px-2 py-1">Platform</th><th class="text-left px-2 py-1">What changes</th><th class="text-left px-2 py-1">From → to</th>
+                    </tr></thead>
+                    <tbody>
+                      <template x-for="c in b.changes" :key="c.id">
+                        <tr class="border-b border-[var(--border-subtle)]">
+                          <td class="py-1"><button x-show="b.status==='draft'" @click="optRemoveChange(b,c)" class="text-[var(--muted-foreground)] hover:text-[var(--negative)]" title="Remove this change">✕</button></td>
+                          <td class="px-2 py-1 font-medium" x-text="c.target"></td>
+                          <td class="px-2 py-1"><span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[var(--primary-light)] text-[var(--primary)]" x-text="c.source"></span></td>
+                          <td class="px-2 py-1 text-[var(--muted-foreground)]" x-text="c.param"></td>
+                          <td class="px-2 py-1"><span x-text="c.before"></span> <span class="text-[var(--muted-foreground)]">→</span> <span class="px-1 rounded font-semibold bg-[var(--warning-light)] text-[var(--warning)]" x-text="c.after"></span></td>
+                        </tr>
+                      </template>
+                    </tbody>
+                  </table>
+                  <!-- sent → per-platform status strip + receipt line + native-approval confirms -->
+                  <template x-if="b.status==='platform_staged'">
+                    <div class="space-y-1.5">
+                      <template x-for="l in (b.lanes||[])" :key="l.source">
+                        <div class="flex flex-wrap items-center gap-2 text-[11px] rounded-lg p-2" :class="l.connected?'bg-[var(--positive-light)] text-[var(--positive)]':'bg-[var(--warning-light)] text-[var(--warning)]'">
+                          <span class="w-1.5 h-1.5 rounded-full" :class="l.connected?'bg-[var(--positive)]':'bg-[var(--warning)]'"></span>
+                          <span x-text="l.connected ? (l.source+': placed as a paused draft “prism-batch-'+b.id+'” ('+l.n+' change'+(l.n===1?'':'s')+') — approve go-live in '+l.source)
+                                                    : (l.source+' isn’t connected — open '+l.source+', make the '+l.n+' change'+(l.n===1?'':'s')+' yourself, then mark approved')"></span>
+                          <a :href="l.url" target="_blank" rel="noopener" class="font-semibold hover:underline" x-text="(l.connected?'Approve in ':'Edit in ')+l.source+' ↗'"></a>
+                        </div>
+                      </template>
+                      <div class="flex flex-wrap items-center gap-2 text-[11px] text-[var(--muted-foreground)]">
+                        <span>Receipt: forecast locked at send — <span class="font-medium text-[var(--foreground)]" x-text="b.forecast?b.forecast.text:''"></span> · results checked 7 days after go-live.</span>
+                        <div class="flex-1"></div>
+                        <button @click="optResolve(b,'live')" title="Tell the app you approved these changes inside the platform" class="text-xs px-2.5 py-1 rounded-lg bg-[var(--positive)] hover:opacity-90 text-white font-medium">✓ I approved it in the platform</button>
+                        <button @click="optResolve(b,'rejected')" title="Tell the app you discarded the draft inside the platform" class="text-xs px-2.5 py-1 rounded-lg border border-[var(--negative)] text-[var(--negative)] hover:bg-[var(--negative-light)]">I rejected it</button>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+              </template>
+              <div x-show="optStagingList().length===0" class="text-xs text-[var(--muted-foreground)] py-2">Nothing here yet — queue a recommendation, click a suggested action, or edit campaigns below.</div>
+            </div>
+          </section>
+
+          <!-- ░░ 04 · CAMPAIGNS ⇄ 05 · CAMPAIGN EDITOR — pick campaigns on the left, edit them together on the right ░░ -->
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
+
+            <!-- 04 campaigns -->
+            <section class="lg:col-span-2 rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] p-4 overflow-x-auto">
+              <div class="flex flex-wrap items-center gap-2 cursor-pointer select-none" :class="opt.collapsed.campaigns?'':'mb-3'" @click="optToggleSec('campaigns')">
+                <span class="text-[var(--muted-foreground)]" x-text="opt.collapsed.campaigns?'▸':'▾'"></span>
+                <span class="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">04 · Campaigns</span>
+                <button class="text-[var(--muted-foreground)] hover:text-[var(--primary)]" @click.stop
+                  @mouseenter="showTip($event, optTipHtml('04 · Campaigns', 'All your campaigns and how they’re doing. Tick rows to edit several at once — “Queued” shows edits waiting in Pending changes.'))"
+                  @mousemove="moveTip($event)" @mouseleave="hideTip()" x-html="icon('info')"></button>
+                <div class="flex-1"></div>
+                <span class="text-xs text-[var(--muted-foreground)] tabular-nums" x-text="optSelectedIds().length ? (optSelectedIds().length+' selected → edit together in the Campaign editor') : (opt.collapsed.campaigns ? optVisible().length+' campaigns' : 'tick campaigns to edit them together →')"></span>
+              </div>
+              <div x-show="!opt.collapsed.campaigns" x-transition>
+              <div class="flex flex-wrap items-center gap-2 mb-3">
+                <input x-model="opt.search" placeholder="Search…" class="w-[180px] px-2 py-1 text-xs rounded-lg border border-[var(--border)] outline-none focus:border-[var(--primary)]">
+                <template x-for="ch in optChips()" :key="ch">
+                  <button @click="opt.chip=ch" class="text-[11px] px-2 py-1 rounded-lg border"
+                    :class="opt.chip===ch?'border-[var(--primary)] text-[var(--primary)] bg-[var(--primary-light)]':'border-[var(--border)] hover:border-[var(--primary)]'" x-text="ch"></button>
+                </template>
+              </div>
+              <table class="w-full text-sm">
+                <thead><tr class="border-b border-[var(--border)]">
+                  <th class="px-2 py-2 w-8"><input type="checkbox" :checked="optAllChecked()" @change="optToggleAll()" class="accent-[var(--primary)]" title="Select all visible"></th>
+                  <template x-for="h in optColumns()" :key="h.label">
+                    <th class="text-left px-2 py-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">
+                      <button class="inline-flex items-center gap-1 hover:text-[var(--foreground)]"
+                        @mouseenter="showTip($event, optTipHtml(h.label, h.calc, h.source))" @mousemove="moveTip($event)" @mouseleave="hideTip()" @focus="showTip($event, optTipHtml(h.label, h.calc, h.source))" @blur="hideTip()">
+                        <span x-text="h.label"></span>
+                        <span class="opacity-60" x-html="icon('info')"></span>
+                      </button>
+                    </th>
+                  </template>
+                </tr></thead>
+                <tbody>
+                  <template x-for="e in optVisible()" :key="e.id">
+                    <tr class="border-b border-[var(--border-subtle)] hover:bg-[var(--sidebar-item-hover)]">
+                      <td class="px-2 py-2"><input type="checkbox" :checked="!!opt.selected[e.id]" @change="opt.selected[e.id]=!opt.selected[e.id]" class="accent-[var(--primary)]"></td>
+                      <td class="px-2 py-2 font-medium" x-text="e.name"></td>
+                      <td class="px-2 py-2"><span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[var(--primary-light)] text-[var(--primary)]" x-text="e.source"></span></td>
+                      <td class="px-2 py-2" x-html="statusBadge(e.status)"></td>
+                      <td class="px-2 py-2 tabular-nums" x-text="fmt('currency',e.cost).exact"></td>
+                      <td class="px-2 py-2 tabular-nums" x-text="e.outcome"></td>
+                      <td class="px-2 py-2 tabular-nums" :class="optCpaClass(e)" x-text="e.cpa!=null?('$'+e.cpa.toFixed(2)):'—'"></td>
+                      <td class="px-2 py-2 tabular-nums"><span :class="e.fatigue>=60?'text-[var(--negative)]':e.fatigue>=40?'text-[var(--warning)]':''" x-text="e.fatigue"></span></td>
+                      <td class="px-2 py-2"><template x-for="st in optStagedFor(e.id)" :key="st.change.id">
+                        <button @click="optRemoveChange(st.batch,st.change)" :title="'Waiting in Pending changes: '+st.change.param+' — click to remove it'"
+                          class="text-[10px] font-semibold px-1.5 py-0.5 rounded mr-1 border border-[var(--warning)] text-[var(--warning)]" x-text="st.change.param+' ✕'"></button></template></td>
+                      <td class="px-2 py-2"><button @click="csOpen(e.id)" :title="optSourceConnected(e.source) ? 'Let the agent write fresh ad copy and add it as a new paused ad set inside this campaign' : 'Let the agent write fresh ad copy — '+e.source+' has no API connection, so you\'ll get the copy plus a link to add it in the platform yourself'"
+                        class="inline-flex items-center gap-1 whitespace-nowrap text-xs px-2 py-1 rounded-lg border border-[var(--border)] hover:border-[var(--primary)] hover:text-[var(--primary)]"><span x-html="icon('spark')"></span> New copy</button></td>
+                    </tr>
+                  </template>
+                  <tr x-show="optVisible().length===0"><td colspan="10" class="text-center py-6 text-[var(--muted-foreground)] text-sm">No campaigns match — widen the search or pick another filter.</td></tr>
+                </tbody>
+              </table>
+              </div>
+            </section>
+
+            <!-- 05 campaign editor — one set of changes applied to every selected campaign -->
+            <section class="rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] p-4 space-y-3">
+              <div class="flex items-center gap-2 cursor-pointer select-none" @click="optToggleSec('editor')">
+                <span class="text-[var(--muted-foreground)]" x-text="opt.collapsed.editor?'▸':'▾'"></span>
+                <span class="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">05 · Campaign editor</span>
+                <button class="text-[var(--muted-foreground)] hover:text-[var(--primary)]" @click.stop
+                  @mouseenter="showTip($event, optTipHtml('05 · Campaign editor', 'One set of edits applied to every campaign you selected. Fields left on “no change” stay untouched. Edits queue in Pending changes for review.'))"
+                  @mousemove="moveTip($event)" @mouseleave="hideTip()" x-html="icon('info')"></button>
+                <div class="flex-1"></div>
+                <button x-show="(optBulkPending().length||opt.bulkFrom) && !opt.collapsed.editor" @click.stop="optBulkClear()" class="text-xs text-[var(--muted-foreground)] hover:text-[var(--foreground)]">Reset</button>
+              </div>
+              <div x-show="!opt.collapsed.editor" x-transition class="space-y-3">
+              <template x-if="!optSelectedIds().length && !optBulkPending().length">
+                <p class="text-xs text-[var(--muted-foreground)] py-6 text-center">No campaigns selected.<br>Tick rows in Campaigns (or click a suggested action above) and the drafted edits will appear here for your review.</p>
+              </template>
+              <template x-if="optSelectedIds().length || optBulkPending().length">
+                <div class="space-y-3">
+                  <p class="text-[11px] text-[var(--muted-foreground)]" x-text="optSelMeta()"></p>
+                  <div x-show="opt.bulkFrom==='console'" class="text-[11px] rounded-lg p-2 bg-[var(--warning-light)] text-[var(--warning)]">Drafted from a suggested action — review the highlighted fields, then <span class="font-semibold">Add to Pending changes</span>.</div>
+                  <template x-for="f in optBulkFields()" :key="f.key">
+                    <div class="rounded-lg border p-2.5 space-y-1.5" :class="(opt.bulk[f.key]||'').toString().trim()?'border-[var(--warning)] bg-[var(--warning-light)]':'border-[var(--border)]'">
+                      <div class="flex items-center justify-between">
+                        <span class="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)]" x-text="f.label"></span>
+                        <span x-show="f.applies" class="text-[9px] font-semibold px-1 py-0.5 rounded bg-[var(--primary-light)] text-[var(--primary)]" :title="'This field only exists on '+f.applies+'-type platforms — other selected campaigns are skipped (and counted)'" x-text="f.applies+' platforms only'"></span>
+                      </div>
+                      <template x-if="f.kind==='chips'">
+                        <div class="flex flex-wrap gap-1.5">
+                          <button @click="opt.bulk[f.key]=''" class="text-[11px] px-2 py-1 rounded-lg border" :class="!(opt.bulk[f.key]||'').trim()?'border-[var(--primary)] text-[var(--primary)] bg-[var(--primary-light)]':'border-[var(--border)] hover:border-[var(--primary)]'">— no change —</button>
+                          <template x-for="o in f.options" :key="o">
+                            <button @click="opt.bulk[f.key]=o" class="text-[11px] px-2 py-1 rounded-lg border" :class="opt.bulk[f.key]===o?'border-[var(--primary)] text-[var(--primary)] bg-[var(--primary-light)]':'border-[var(--border)] hover:border-[var(--primary)]'" x-text="o"></button>
+                          </template>
+                        </div>
+                      </template>
+                      <template x-if="f.kind==='text'">
+                        <input x-model="opt.bulk[f.key]" :placeholder="f.ph+' — blank = no change'" class="w-full px-2 py-1.5 text-xs rounded-lg border border-[var(--border)] outline-none focus:border-[var(--primary)] bg-[var(--surface-elevated)]">
+                      </template>
+                      <div class="text-[10px] text-[var(--muted-foreground)]">current: <span x-text="optCurrent(f.key)"></span></div>
+                    </div>
+                  </template>
+                  <div class="flex items-center gap-2 pt-1 border-t border-[var(--border-subtle)]">
+                    <span class="text-[11px] text-[var(--muted-foreground)] tabular-nums" x-text="optBulkPreview().n+' edit'+(optBulkPreview().n===1?'':'s')+' ready'+(optBulkPreview().sk?(' · '+optBulkPreview().sk+' skipped (field doesn’t exist on that platform)'):'')"></span>
+                    <div class="flex-1"></div>
+                    <button @click="optStageBulk()" title="Queues these edits in Pending changes (03) for your review — nothing is sent yet" class="text-xs px-3 py-1.5 rounded-lg bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white font-medium">Add to Pending changes</button>
+                  </div>
+                </div>
+              </template>
+              </div>
+            </section>
+          </div>
+
+          <!-- ░░ 06 · HISTORY & RESULTS — everything sent, its approval status, and how it turned out ░░ -->
+          <section class="rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] p-4 overflow-x-auto">
+            <div class="flex items-center gap-2 cursor-pointer select-none" :class="opt.collapsed.history?'':'mb-3'" @click="optToggleSec('history')">
+              <span class="text-[var(--muted-foreground)]" x-text="opt.collapsed.history?'▸':'▾'"></span>
+              <span class="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">06 · History &amp; results</span>
+              <button class="text-[var(--muted-foreground)] hover:text-[var(--primary)]" @click.stop
+                @mouseenter="showTip($event, optTipHtml('06 · History & results', 'Everything sent, its status, and how it did — forecast vs actual after 7 days. “Revert” queues the opposite change.'))"
+                @mousemove="moveTip($event)" @mouseleave="hideTip()" x-html="icon('info')"></button>
+              <span x-show="!opt.collapsed.history" class="text-xs text-[var(--muted-foreground)]">click a row for the full details + receipt</span>
+              <span x-show="opt.collapsed.history" class="text-xs text-[var(--muted-foreground)] tabular-nums" x-text="optHistory().length+' sent'"></span>
+            </div>
+            <div x-show="!opt.collapsed.history" x-transition>
+            <table class="w-full text-sm">
+              <thead><tr class="border-b border-[var(--border)]">
+                <template x-for="h in ['When','From','Batch','Changes','Platforms','Status','Result (forecast vs actual, after 7 days)']" :key="h"><th class="text-left px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)]" x-text="h"></th></template>
+              </tr></thead>
+              <template x-for="b in optHistory()" :key="b.id">
+                <tbody>
+                  <tr class="border-b border-[var(--border-subtle)] hover:bg-[var(--sidebar-item-hover)] cursor-pointer" @click="opt.histOpen[b.id]=!opt.histOpen[b.id]">
+                        <td class="px-3 py-2 tabular-nums text-[var(--muted-foreground)]" x-text="b.sentAt||b.createdAt"></td>
+                        <td class="px-3 py-2"><span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded" :class="optSrcBadge(b.source)" x-text="optSrcLabel(b.source)"></span></td>
+                        <td class="px-3 py-2 font-medium" x-text="b.title"></td>
+                        <td class="px-3 py-2 tabular-nums" x-text="b.changes.length"></td>
+                        <td class="px-3 py-2 text-[var(--muted-foreground)]" x-text="optBatchSources(b).join(' + ')"></td>
+                        <td class="px-3 py-2"><span class="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded"
+                          :class="b.status==='live'?'bg-[var(--positive-light)] text-[var(--positive)]':b.status==='rejected'?'bg-[var(--negative-light)] text-[var(--negative)]':'bg-[var(--warning-light)] text-[var(--warning)]'"
+                          x-text="b.status==='live'?('LIVE · approved in platform '+(b.resolvedAt||'')):b.status==='rejected'?'REJECTED IN PLATFORM':'AWAITING YOUR APPROVAL IN THE PLATFORM'"></span></td>
+                        <td class="px-3 py-2 text-xs">
+                          <template x-if="b.status==='rejected'"><span class="text-[var(--muted-foreground)]">— draft discarded</span></template>
+                          <template x-if="b.status==='platform_staged'"><span class="text-[var(--muted-foreground)]">starts once you approve go-live</span></template>
+                          <template x-if="b.status==='live'&&!b.outcome">
+                            <span class="text-[var(--muted-foreground)]">checked after 7 days
+                              <button x-show="dataSource==='synthetic'" @click.stop="optScore(b)" class="ml-1 text-[10px] px-1.5 py-0.5 rounded border border-[var(--border)] hover:border-[var(--primary)] hover:text-[var(--primary)]">simulate 7-day check</button>
+                            </span>
+                          </template>
+                          <template x-if="b.outcome">
+                            <span class="font-semibold" :class="b.outcome.verdict==='beat'||b.outcome.verdict==='met'?'text-[var(--positive)]':b.outcome.verdict==='partial_miss'?'text-[var(--warning)]':'text-[var(--negative)]'" x-text="b.outcome.text"></span>
+                          </template>
+                        </td>
+                      </tr>
+                      <tr x-show="opt.histOpen[b.id]" class="border-b border-[var(--border-subtle)]">
+                        <td colspan="7" class="px-3 py-2 bg-[var(--surface)]">
+                          <div class="space-y-1.5 text-xs">
+                            <template x-for="c in b.changes" :key="c.id">
+                              <div class="flex flex-wrap items-center gap-2">
+                                <span class="font-medium" x-text="c.target"></span>
+                                <span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[var(--primary-light)] text-[var(--primary)]" x-text="c.source"></span>
+                                <span class="text-[var(--muted-foreground)]" x-text="c.param+':'"></span>
+                                <span x-text="c.before"></span><span class="text-[var(--muted-foreground)]">→</span>
+                                <span class="px-1 rounded font-semibold bg-[var(--warning-light)] text-[var(--warning)]" x-text="c.after"></span>
+                              </div>
+                            </template>
+                            <div class="text-[var(--muted-foreground)] pt-1" x-show="b.forecast">
+                              Forecast (locked <span x-text="b.forecast?b.forecast.frozenAt:''"></span>, confidence <span x-text="b.forecast?b.forecast.confidence:''"></span>): <span class="text-[var(--foreground)]" x-text="b.forecast?b.forecast.text:''"></span>
+                              <span x-show="b.outcome"> · Checked <span x-text="b.outcome?b.outcome.scoredAt:''"></span>: <span x-text="b.outcome?b.outcome.text:''"></span></span>
+                            </div>
+                            <div class="pt-1" x-show="b.status==='live'">
+                              <button @click.stop="optRevertBatch(b)" title="Queues the opposite change in Pending changes — reviewed and sent like any other change" class="text-xs px-2.5 py-1 rounded-lg border border-[var(--border)] hover:border-[var(--primary)] hover:text-[var(--primary)]">Revert — queue the opposite change</button>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                </tbody>
+              </template>
+              <tbody x-show="optHistory().length===0"><tr><td colspan="7" class="text-center py-6 text-[var(--muted-foreground)]">Nothing sent yet — every batch you send is logged here with its result after 7 days.</td></tr></tbody>
+            </table>
+            </div>
+          </section>
+        </div>
+      </template>

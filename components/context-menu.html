@@ -1,0 +1,57 @@
+<!--
+  COMPONENT: context-menu
+  Purpose: Right-click context menu — three sections (Global / This widget only / Other).
+  Alpine scope expected: ctxMenu { widgetId, field, value, x, y } | null, plus methods addFilter, replaceFilter, drill, setCompare.
+  Usage: paste once near </body>. Set ctxMenu via @contextmenu.prevent on chart datums.
+-->
+<div x-show="ctxMenu" x-transition.opacity
+     @click.outside="ctxMenu = null"
+     @keydown.escape.window="ctxMenu = null"
+     :style="ctxMenu ? `top: ${ctxMenu.y}px; left: ${ctxMenu.x}px;` : ''"
+     class="fixed z-50 w-[260px] bg-[var(--surface-elevated)] border border-[var(--border)] rounded-lg shadow-lg overflow-hidden"
+     role="menu">
+  <template x-if="ctxMenu">
+    <div>
+      <!-- Global section -->
+      <div class="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--chip-global)] bg-[var(--chip-global)]/8 border-b border-[var(--border-subtle)]">Global</div>
+      <button @click="addFilter('global', { field: ctxMenu.field, op: 'in', values: [ctxMenu.value] }); ctxMenu = null"
+              class="w-full text-left px-3 py-2 text-sm hover:bg-[var(--sidebar-item-hover)]" role="menuitem">
+        <span>Filter all widgets to</span> <span class="font-semibold" x-text="'"' + ctxMenu.value + '"'"></span>
+      </button>
+      <button @click="addFilter('global', { field: ctxMenu.field, op: 'not_in', values: [ctxMenu.value] }); ctxMenu = null"
+              class="w-full text-left px-3 py-2 text-sm hover:bg-[var(--sidebar-item-hover)]" role="menuitem">
+        <span>Exclude</span> <span class="font-semibold" x-text="'"' + ctxMenu.value + '"'"></span>
+      </button>
+      <button @click="drill(ctxMenu.field, ctxMenu.value); ctxMenu = null"
+              class="w-full text-left px-3 py-2 text-sm hover:bg-[var(--sidebar-item-hover)]" role="menuitem">
+        Drill (cross-filter)
+      </button>
+
+      <!-- Widget section (only when in widget context) -->
+      <template x-if="ctxMenu.widgetId">
+        <div>
+          <div class="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--chip-widget)] bg-[var(--chip-widget)]/8 border-y border-[var(--border-subtle)]">This widget only</div>
+          <button @click="addFilter('widget', { field: ctxMenu.field, op: 'in', values: [ctxMenu.value] }, ctxMenu.widgetId); ctxMenu = null"
+                  class="w-full text-left px-3 py-2 text-sm hover:bg-[var(--sidebar-item-hover)]" role="menuitem">
+            Filter THIS widget to <span class="font-semibold" x-text="'"' + ctxMenu.value + '"'"></span>
+          </button>
+          <button @click="addFilter('widget', { field: ctxMenu.field, op: 'not_in', values: [ctxMenu.value] }, ctxMenu.widgetId); ctxMenu = null"
+                  class="w-full text-left px-3 py-2 text-sm hover:bg-[var(--sidebar-item-hover)]" role="menuitem">
+            Exclude from THIS widget
+          </button>
+        </div>
+      </template>
+
+      <!-- Other -->
+      <div class="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)] bg-[var(--surface)] border-y border-[var(--border-subtle)]">Other</div>
+      <button @click="compare = 'prior'; loadAll(); ctxMenu = null"
+              class="w-full text-left px-3 py-2 text-sm hover:bg-[var(--sidebar-item-hover)]" role="menuitem">
+        Compare to prior period
+      </button>
+      <button @click="ctxMenu = null"
+              class="w-full text-left px-3 py-2 text-sm hover:bg-[var(--sidebar-item-hover)]" role="menuitem">
+        Send to chat (coming soon)
+      </button>
+    </div>
+  </template>
+</div>

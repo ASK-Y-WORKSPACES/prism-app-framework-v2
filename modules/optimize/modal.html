@@ -1,0 +1,147 @@
+<!-- ══ DISMISS-REASON MODAL (optimize) — a dismissed rec logs WHY, feeding the rec feedback loop ══ -->
+<div x-show="opt.dismissRec" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/30" @click.self="opt.dismissRec=null">
+  <div class="w-[420px] rounded-xl bg-[var(--surface-elevated)] border border-[var(--border)] shadow-md p-5 space-y-3">
+    <h3 class="text-sm font-semibold">Dismiss recommendation</h3>
+    <p class="text-xs text-[var(--muted-foreground)]" x-text="opt.dismissRec ? opt.dismissRec.title : ''"></p>
+    <div class="flex flex-wrap gap-1.5">
+      <template x-for="r in ['Didn’t work before','Conflicts with strategy','Reasoning wrong','Too risky']" :key="r">
+        <button @click="opt.dismissReason=r" class="text-xs px-2 py-1 rounded-lg border"
+          :class="opt.dismissReason===r?'border-[var(--primary)] text-[var(--primary)] bg-[var(--primary-light)]':'border-[var(--border)] hover:border-[var(--primary)]'" x-text="r"></button>
+      </template>
+    </div>
+    <input x-model="opt.dismissNote" placeholder="Anything else? (optional)" class="w-full px-2 py-1.5 text-xs rounded-lg border border-[var(--border)] outline-none focus:border-[var(--primary)]">
+    <p class="text-[11px] text-[var(--muted-foreground)]">Remembered on this browser: this suggestion won’t come back, and dismissing the same type twice as <i>“Conflicts with strategy”</i> or <i>“Too risky”</i> mutes that type entirely (you can unmute in the header).</p>
+    <div class="flex justify-end gap-2">
+      <button @click="opt.dismissRec=null" class="text-xs px-3 py-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--surface)]">Cancel</button>
+      <button @click="optDismissConfirm()" class="text-xs px-3 py-1.5 rounded-lg bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white font-medium">Dismiss</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ CREATIVE STUDIO (optimize) — refresh ad copy → new PAUSED ad set. A direct action: the result is
+     inherently platform-staged (paused until enabled natively), logged to Staging/History as a batch. ══ -->
+<div x-show="opt.cs.open" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4" @click.self="csClose()">
+  <div class="absolute inset-0 bg-black/40" aria-hidden></div>
+  <div role="dialog" aria-modal="true" class="relative flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] shadow-md" @click.stop x-data="{ get e(){ return optEntity(opt.cs.entityId)||{}; } }">
+    <header class="flex items-center gap-2 border-b border-[var(--border)] px-5 py-3">
+      <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--primary-light)] text-[var(--primary)]" x-html="icon('spark')"></span>
+      <div class="min-w-0 flex-1">
+        <div class="truncate text-sm font-semibold">Refresh creative</div>
+        <div class="truncate text-[11px] text-[var(--muted-foreground)]" x-text="e.name||''"></div>
+      </div>
+      <a x-show="e.source && !optSourceConnected(e.source)" :href="optPlatformUrl(e.source)" target="_blank" rel="noopener" class="text-xs text-[var(--primary)] hover:underline mr-1 whitespace-nowrap">Open the platform ↗</a>
+      <button @click="csClose()" aria-label="Close" class="flex h-7 w-7 items-center justify-center rounded-lg text-[var(--muted-foreground)] hover:bg-[var(--sidebar-item-hover)]" x-html="icon('x')"></button>
+    </header>
+
+    <div class="overflow-y-auto p-5">
+      <!-- loading current creative -->
+      <template x-if="opt.cs.ctxLoading">
+        <div class="py-8 text-sm text-[var(--muted-foreground)]">Loading current creative…</div>
+      </template>
+      <!-- done — created (API write / simulated) vs handed off (copy ready + a link to add it in the platform) -->
+      <template x-if="!opt.cs.ctxLoading && opt.cs.phase==='done'">
+        <div class="flex flex-col items-center gap-2 py-10 text-center">
+          <span class="text-3xl" x-text="opt.cs.result!=='manual' ? '✅' : '📋'"></span>
+          <template x-if="opt.cs.result!=='manual'">
+            <div>
+              <div class="text-sm font-semibold">New ad set created — paused</div>
+              <div class="max-w-sm text-xs text-[var(--muted-foreground)] mt-1">A new ad set + ad with your chosen copy was added to <strong x-text="e.name"></strong>, left <strong>paused</strong>. It’s logged in Staging/History and won’t spend until you enable it <strong>in the platform</strong> — go-live approval never happens here.</div>
+            </div>
+          </template>
+          <template x-if="opt.cs.result==='manual'">
+            <div class="flex flex-col items-center gap-2">
+              <div class="text-sm font-semibold">Your new ad copy is ready — add it in the platform</div>
+              <div class="max-w-sm text-xs text-[var(--muted-foreground)]">This platform has no API connection, so this app can’t create it for you. Open the platform, add a new <strong>paused</strong> ad set on <strong x-text="e.name"></strong>, and paste the copy below in. It’s logged here so you have a record.</div>
+              <div class="mt-1 w-full max-w-sm text-left text-xs rounded-lg border border-[var(--border)] bg-[var(--surface)] p-2.5">
+                <div><span class="text-[var(--muted-foreground)]">Headline:</span> <span class="font-medium" x-text="opt.cs.edited.headline||'—'"></span></div>
+                <div class="mt-1"><span class="text-[var(--muted-foreground)]">Primary:</span> <span x-text="opt.cs.edited.primaryText||'—'"></span></div>
+                <div class="mt-1"><span class="text-[var(--muted-foreground)]">Description:</span> <span x-text="opt.cs.edited.description||'—'"></span></div>
+              </div>
+              <a :href="optPlatformUrl(e.source)" target="_blank" rel="noopener" class="mt-1 inline-flex items-center gap-1.5 rounded-lg bg-[var(--primary)] px-4 py-1.5 text-xs font-semibold text-white hover:bg-[var(--primary-hover)]">Open the platform ↗</a>
+            </div>
+          </template>
+          <button @click="csClose()" class="mt-2 rounded-lg border border-[var(--border)] px-4 py-1.5 text-xs font-semibold hover:bg-[var(--surface)]">Done</button>
+        </div>
+      </template>
+      <!-- edit -->
+      <template x-if="!opt.cs.ctxLoading && opt.cs.phase!=='done' && opt.cs.ctx">
+        <div class="grid gap-5 md:grid-cols-2">
+          <!-- current -->
+          <div>
+            <div class="mb-2 text-[10px] font-semibold uppercase tracking-wide text-[var(--muted-foreground)]" x-text="opt.cs.ctx.noCurrent ? 'This campaign' : 'Current creative'"></div>
+            <!-- no API connection → we can't read the live ad; generate fresh copy from the campaign's details -->
+            <template x-if="opt.cs.ctx.noCurrent">
+              <div class="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3 text-xs text-[var(--muted-foreground)]">
+                The current ad can’t be read without an API connection to the platform, so there’s nothing to copy from. We’ll write <span class="font-medium text-[var(--foreground)]">fresh</span> ad copy based on this campaign’s details, for you to add in the platform.
+              </div>
+            </template>
+            <template x-if="!opt.cs.ctx.noCurrent">
+              <div class="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3">
+                <template x-if="opt.cs.ctx.imageUrl"><img :src="opt.cs.ctx.imageUrl" alt="" class="mb-2 h-28 w-full rounded-lg object-cover"></template>
+                <div class="text-xs"><span class="text-[var(--muted-foreground)]">Headline:</span> <span class="font-medium" x-text="opt.cs.ctx.headline||'—'"></span></div>
+                <div class="mt-1 text-xs"><span class="text-[var(--muted-foreground)]">Primary:</span> <span x-text="opt.cs.ctx.primaryText||'—'"></span></div>
+                <div class="mt-1 text-xs"><span class="text-[var(--muted-foreground)]">Description:</span> <span x-text="opt.cs.ctx.description||'—'"></span></div>
+              </div>
+            </template>
+            <button @click="csGenerate()" :disabled="opt.cs.genBusy" class="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-[var(--primary)] px-3 py-2 text-sm font-semibold text-white hover:bg-[var(--primary-hover)] disabled:opacity-60">
+              <span x-html="icon('spark')"></span> <span x-text="opt.cs.genBusy?'Generating…':(opt.cs.variants?'Regenerate options':'Generate options')"></span>
+            </button>
+            <template x-if="opt.cs.genErr"><div class="mt-2 rounded-lg border border-[var(--negative)] bg-[var(--negative-light)] p-2 text-[11px] text-[var(--negative)]" x-text="opt.cs.genErr"></div></template>
+          </div>
+          <!-- options + editable copy -->
+          <div>
+            <div class="mb-2 text-[10px] font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">Suggested options</div>
+            <template x-if="!opt.cs.variants"><div class="rounded-xl border border-dashed border-[var(--border)] p-4 text-center text-xs text-[var(--muted-foreground)]">Click “Generate options” to get AI-written variants.</div></template>
+            <template x-if="opt.cs.variants">
+              <div>
+                <div class="space-y-2">
+                  <template x-for="(v,i) in opt.cs.variants" :key="i">
+                    <button @click="csPick(i)" class="block w-full rounded-lg border p-2 text-left" :class="opt.cs.sel===i?'border-[var(--primary)] bg-[var(--primary-light)]':'border-[var(--border)] hover:border-[var(--primary)]'">
+                      <div class="text-xs font-semibold" x-text="v.headline"></div>
+                      <div class="text-[11px] text-[var(--muted-foreground)]" x-text="v.primaryText"></div>
+                    </button>
+                  </template>
+                </div>
+                <div class="mt-3 space-y-2">
+                  <div class="flex items-center justify-between"><span class="text-[10px] font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">Headline</span><span class="text-[10px]" :class="csOver('headline',40)?'text-[var(--negative)]':'text-[var(--muted-foreground)]'" x-text="(opt.cs.edited.headline||'').length+'/40'"></span></div>
+                  <input x-model="opt.cs.edited.headline" class="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] px-3 py-2 text-sm outline-none focus:border-[var(--primary)]">
+                  <div class="flex items-center justify-between"><span class="text-[10px] font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">Primary text</span><span class="text-[10px]" :class="csOver('primaryText',125)?'text-[var(--negative)]':'text-[var(--muted-foreground)]'" x-text="(opt.cs.edited.primaryText||'').length+'/125'"></span></div>
+                  <textarea rows="3" x-model="opt.cs.edited.primaryText" class="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] px-3 py-2 text-sm outline-none focus:border-[var(--primary)]"></textarea>
+                  <div class="flex items-center justify-between"><span class="text-[10px] font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">Description</span><span class="text-[10px]" :class="csOver('description',30)?'text-[var(--negative)]':'text-[var(--muted-foreground)]'" x-text="(opt.cs.edited.description||'').length+'/30'"></span></div>
+                  <input x-model="opt.cs.edited.description" class="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] px-3 py-2 text-sm outline-none focus:border-[var(--primary)]">
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </template>
+      <template x-if="!opt.cs.ctxLoading && !opt.cs.ctx && opt.cs.genErr">
+        <div class="rounded-lg border border-[var(--negative)] bg-[var(--negative-light)] p-3 text-xs text-[var(--negative)]" x-text="opt.cs.genErr"></div>
+      </template>
+    </div>
+
+    <!-- footer: edit → confirm → create -->
+    <template x-if="opt.cs.ctx && opt.cs.phase!=='done'">
+      <footer class="border-t border-[var(--border)] px-5 py-3">
+        <template x-if="opt.cs.phase==='confirm'">
+          <div class="mb-3 flex items-start gap-2 rounded-lg border border-[var(--warning)] bg-[var(--warning-light)] p-2.5 text-xs">
+            <span class="mt-0.5 shrink-0" x-html="icon('warning')"></span>
+            <span x-text="!optSourceConnected(e.source) ? ('This platform has no API connection, so this app can’t create the ad set. Continue to get your finished copy and a link to add it as a new PAUSED ad set in the platform yourself — it’s logged here for your records.') : (dataSource==='real' ? ('This duplicates the current ad set (keeping its settings) inside '+e.name+', adds a new ad with your copy, and leaves it PAUSED on your live account — you enable it natively in the platform.') : 'Demo mode: this is simulated — it logs a paused-ad-set batch to Staging/History without touching a live account.')"></span>
+          </div>
+        </template>
+        <template x-if="opt.cs.applyErr"><div class="mb-2 rounded-lg border border-[var(--negative)] bg-[var(--negative-light)] p-2 text-[11px] text-[var(--negative)]" x-text="opt.cs.applyErr"></div></template>
+        <div class="flex items-center justify-end gap-2">
+          <template x-if="opt.cs.phase==='confirm'">
+            <div class="flex items-center gap-2">
+              <button @click="opt.cs.phase='edit'" :disabled="opt.cs.applyBusy" class="rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-medium hover:bg-[var(--surface)] disabled:opacity-50">Back</button>
+              <button @click="csConfirm()" :disabled="opt.cs.applyBusy" class="inline-flex items-center gap-1.5 rounded-lg bg-[var(--primary)] px-4 py-1.5 text-xs font-semibold text-white hover:bg-[var(--primary-hover)] disabled:opacity-60" x-text="opt.cs.applyBusy ? (optSourceConnected(e.source)?'Creating…':'Preparing…') : (optSourceConnected(e.source)?'Confirm & create':'Get copy + open platform')"></button>
+            </div>
+          </template>
+          <template x-if="opt.cs.phase!=='confirm'">
+            <button @click="opt.cs.phase='confirm'" :disabled="!csCanConfirm()" title="Generate and pick an option first" class="rounded-lg bg-[var(--primary)] px-4 py-1.5 text-xs font-semibold text-white hover:bg-[var(--primary-hover)] disabled:opacity-50" x-text="optSourceConnected(e.source)?'Create paused ad set':'Get copy + platform link'"></button>
+          </template>
+        </div>
+      </footer>
+    </template>
+  </div>
+</div>

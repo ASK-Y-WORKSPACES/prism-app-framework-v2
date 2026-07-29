@@ -1,0 +1,43 @@
+<!--
+  COMPONENT: command-palette
+  Purpose: ⌘K modal — lists slicer fields + actions, arrow/Enter/Esc keys.
+  Alpine scope expected: commandPaletteOpen, paletteQuery, paletteItems(), paletteSelect(item).
+  Usage: paste once near </body>. Opens via ⌘K, '+ Add filter' button, or any 'Filter by …' affordance.
+-->
+<div x-show="commandPaletteOpen" x-transition.opacity
+     @click.self="commandPaletteOpen = false"
+     @keydown.escape.window="commandPaletteOpen = false"
+     class="fixed inset-0 z-40 bg-black/30 flex items-start justify-center pt-[15vh]">
+  <div class="w-[600px] max-w-[90vw] bg-[var(--surface-elevated)] border border-[var(--border)] rounded-xl shadow-lg overflow-hidden">
+
+    <!-- Widget-scope banner -->
+    <template x-if="commandPaletteScope && commandPaletteScope.widget">
+      <div class="px-4 py-2 bg-[var(--chip-widget)]/10 border-b border-[var(--chip-widget)]/20 flex items-center gap-2 text-xs">
+        <span class="text-[var(--chip-widget)] font-semibold uppercase tracking-wider">Filtering only:</span>
+        <span x-text="commandPaletteScope.widgetTitle"></span>
+        <button @click="commandPaletteScope = null" class="ml-auto text-[var(--muted-foreground)] hover:text-[var(--primary)]">switch to global</button>
+      </div>
+    </template>
+
+    <div class="flex items-center gap-2 px-4 py-3 border-b border-[var(--border)]">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-[var(--muted-foreground)]">
+        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      </svg>
+      <input x-ref="paletteInput"
+             x-init="$watch('commandPaletteOpen', v => v && setTimeout(() => $refs.paletteInput.focus(), 50))"
+             type="text" x-model="paletteQuery" placeholder="Type to filter…"
+             class="flex-1 bg-transparent text-sm outline-none">
+      <span class="text-[10px] text-[var(--muted-foreground)] border border-[var(--border)] px-1.5 py-0.5 rounded">esc</span>
+    </div>
+    <div class="max-h-[50vh] overflow-y-auto py-2">
+      <template x-for="item in paletteItems()" :key="item.id">
+        <button @click="paletteSelect(item)"
+                class="w-full flex items-center gap-3 px-4 py-2 text-left text-sm hover:bg-[var(--sidebar-item-hover)]">
+          <span class="text-[var(--muted-foreground)]" x-text="item.icon"></span>
+          <span class="flex-1" x-text="item.label"></span>
+          <span x-show="item.hint" class="text-[10px] text-[var(--muted-foreground)] border border-[var(--border)] px-1 py-px rounded" x-text="item.hint"></span>
+        </button>
+      </template>
+    </div>
+  </div>
+</div>

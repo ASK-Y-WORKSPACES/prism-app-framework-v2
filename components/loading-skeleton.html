@@ -1,0 +1,12 @@
+<!--
+  COMPONENT: loading-skeleton
+  Purpose: Three gray pulsing bars while a card is loading. Respects prefers-reduced-motion via CSS keyframes.
+  Alpine scope expected: parent with `loading` boolean.
+  Usage: <template x-if="loading"> {block} </template>
+-->
+<div role="status" aria-live="polite" aria-label="Loading" class="p-4 space-y-3">
+  <span class="sr-only">Loading…</span>
+  <div aria-hidden="true" class="skel h-4 w-1/3"></div>
+  <div aria-hidden="true" class="skel h-4 w-1/2"></div>
+  <div aria-hidden="true" class="skel h-8 w-full"></div>
+</div>

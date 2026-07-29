@@ -1,0 +1,11 @@
+<!-- copysummary: copy the visible table as a REAL table — rich HTML (formatted table for
+     Docs/Slack/email) + tab-separated text (columns for Sheets/Excel) on the clipboard.
+     Opt-in per section — only renders when the table config sets `copySummary`. -->
+<template x-if="sec.table && sec.table.copySummary">
+  <button @click="copyPerfSummary(sec)"
+    title="Copy this table — pastes as a formatted table into Docs/Slack/email and as columns into Sheets/Excel"
+    class="px-3 py-1.5 rounded-lg border border-[var(--border)] text-xs font-medium flex items-center gap-1.5 hover:border-[var(--primary)] hover:text-[var(--primary)]">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+    <span>Copy Performance Summary</span>
+  </button>
+</template>

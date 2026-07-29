@@ -1,0 +1,32 @@
+<!--
+  COMPONENT: kpi-card
+  Purpose: KPI card — eyebrow label, big tabular-nums value, 3-icon chrome row, optional delta pill, sparkline.
+  Alpine scope expected: a kpi object { label, value, delta?: {direction, pct}, favorableUp, spark: number[] } + module-scope helpers chartColor() and renderSparkline().
+  Usage: <template x-for="(k, i) in kpis" :key="i">  …copy this block…  </template>
+-->
+<article class="relative bg-[var(--surface-elevated)] border border-[var(--border)] rounded-xl shadow-sm p-4 transition-shadow hover:shadow-md">
+  <div class="flex items-start justify-between mb-1 gap-2">
+    <div class="text-xs font-semibold uppercase tracking-wider text-[var(--muted-foreground)] truncate" x-text="k.label"></div>
+    <div class="flex items-center gap-0.5 -mt-1 -mr-1">
+      <button class="w-6 h-6 rounded flex items-center justify-center text-[var(--muted-foreground)] hover:text-[var(--primary)] hover:bg-[var(--surface)]" title="Filter this widget">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+      </button>
+      <button class="w-6 h-6 rounded flex items-center justify-center text-[var(--muted-foreground)] hover:text-[var(--primary)] hover:bg-[var(--surface)]" title="Info">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+      </button>
+    </div>
+  </div>
+  <div class="text-2xl font-bold tabular-nums" x-text="k.value"></div>
+  <!-- Delta pill: the % is cursor-help and, on hover, states WHAT it's compared against
+       (prior period vs. same period last year) so a green/red arrow is never ambiguous. -->
+  <template x-if="k.delta && compare !== 'off'">
+    <div class="mt-1 flex items-center gap-1.5 cursor-help"
+         :title="'Change vs. ' + (compare === 'prior' ? 'the previous period of the same length' : 'the same period last year (YoY)') + ' — for the currently selected date range.'">
+      <span class="text-xs font-medium tabular-nums"
+            :class="(k.delta.direction === 'up') === k.favorableUp ? 'text-[var(--positive)]' : (k.delta.direction === 'flat' ? 'text-[var(--muted-foreground)]' : 'text-[var(--negative)]')"
+            x-text="(k.delta.direction === 'up' ? '+' : k.delta.direction === 'down' ? '−' : '') + k.delta.pct"></span>
+      <span class="text-[10px] text-[var(--muted-foreground)]" x-text="'vs. ' + (compare === 'prior' ? 'prior' : 'YoY')"></span>
+    </div>
+  </template>
+  <div class="mt-3 -mx-1 h-[36px]" :x-ref="'spark_' + i" x-init="renderSparkline($refs['spark_' + i], k.spark, k.favorableUp)"></div>
+</article>

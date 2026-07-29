@@ -1,0 +1,33 @@
+<!--
+  COMPONENT: slicer-numeric
+  Purpose: Numeric range slicer — min / max number inputs (v1; v2 = dual-handle slider with histogram).
+  Alpine scope expected: s (slicer), filters, plus methods addFilter / removeFilter.
+  Usage: inside SlicerPanel card body when slicerLabels[s.id].type === 'numeric'.
+-->
+<div class="p-3 space-y-3"
+     x-data="{
+       get currentRule() { return (filters.global || []).find(r => r.field === s.id && r.op === 'between'); },
+       get minVal() { return this.currentRule ? this.currentRule.values[0] : ''; },
+       get maxVal() { return this.currentRule ? this.currentRule.values[1] : ''; },
+       apply(min, max) {
+         if (min === '' && max === '') { removeFilter('global', s.id, null, 'between'); return; }
+         const lo = min === '' ? -Infinity : Number(min);
+         const hi = max === '' ? Infinity  : Number(max);
+         replaceFilter('global', { field: s.id, op: 'between', values: [lo, hi] });
+       }
+     }">
+  <div class="flex items-center gap-2">
+    <input type="number" :value="minVal === -Infinity ? '' : minVal"
+           @change="apply($event.target.value, maxVal === Infinity ? '' : maxVal)"
+           placeholder="min"
+           class="w-full px-2 py-1.5 text-sm rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] focus:border-[var(--primary)] outline-none tabular-nums">
+    <span class="text-xs text-[var(--muted-foreground)]">to</span>
+    <input type="number" :value="maxVal === Infinity ? '' : maxVal"
+           @change="apply(minVal === -Infinity ? '' : minVal, $event.target.value)"
+           placeholder="max"
+           class="w-full px-2 py-1.5 text-sm rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] focus:border-[var(--primary)] outline-none tabular-nums">
+  </div>
+  <button @click="removeFilter('global', s.id, null, 'between')"
+          class="text-[11px] text-[var(--muted-foreground)] hover:text-[var(--negative)]"
+          x-show="currentRule">Clear</button>
+</div>

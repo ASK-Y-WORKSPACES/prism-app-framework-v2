@@ -1,0 +1,64 @@
+      <!-- funnel layout: funnel chart + step table (point 9 — usable as a tab beside dashboards) -->
+      <template x-if="sec.layout==='funnel'">
+        <div class="space-y-6">
+          <section class="bg-[var(--surface-elevated)] border border-[var(--border)] rounded-xl shadow-sm p-4">
+            <div class="flex items-center justify-between mb-4">
+              <div><h3 class="text-sm font-semibold" x-text="sec.funnelTitle||'Conversion funnel'"></h3>
+                <p class="text-xs text-[var(--muted-foreground)]" x-text="`${sec.funnel.steps.length} steps · count of ${sec.funnel.identity||'sessions'} reaching each step`"></p></div>
+            </div>
+            <div :id="`funnel-${sec.id}`" style="height:340px"></div>
+            <div x-show="(sec._funnel||[]).length===0 && !loading" class="text-center py-8 text-sm text-[var(--muted-foreground)]">No results match the selected filters.</div>
+          </section>
+          <section class="bg-[var(--surface-elevated)] border border-[var(--border)] rounded-xl shadow-sm p-4 overflow-x-auto">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-sm font-semibold">Step breakdown</h3>
+              <!-- overall conversion: last step ÷ first step, stated plainly -->
+              <span x-show="(sec._funnel||[]).length>1" class="text-xs text-[var(--muted-foreground)]"
+                x-text="'Overall conversion '+((sec._funnel[sec._funnel.length-1].count/Math.max(sec._funnel[0].count,1))*100).toFixed(1)+'%'"></span>
+            </div>
+            <table class="w-full text-sm">
+              <thead><tr class="border-b border-[var(--border)]">
+                <template x-for="h in ['Step','Reached','% of total','Continued','Dropped']" :key="h">
+                  <th class="text-left py-2.5 px-3 text-[10px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)]"
+                    :class="['% of total','Continued','Dropped'].includes(h)?'whitespace-nowrap':''" x-text="h"></th>
+                </template>
+              </tr></thead>
+              <tbody>
+                <template x-for="(f,fi) in (sec._funnel||[])" :key="fi">
+                  <tr class="border-b border-[var(--border-subtle)] hover:bg-[var(--sidebar-item-hover)]" :class="f.isBottleneck?'bg-[var(--negative-light)]/40':''">
+                    <!-- Step: numbered marker + name + "biggest drop" flag on the bottleneck -->
+                    <td class="py-2.5 px-3">
+                      <div class="flex items-center gap-2">
+                        <span class="w-5 h-5 rounded-full text-[10px] font-semibold flex items-center justify-center text-white shrink-0" :style="`background:${chartColor(fi+1)}`" x-text="fi+1"></span>
+                        <span class="font-medium whitespace-nowrap" x-text="f.name"></span>
+                        <span x-show="f.isBottleneck" class="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-[var(--negative-light)] text-[var(--negative)] whitespace-nowrap">biggest drop</span>
+                      </div>
+                    </td>
+                    <!-- Reached: an inline proportional bar (the table reads like the funnel) + the count -->
+                    <td class="py-2.5 px-3">
+                      <div class="flex items-center gap-2.5">
+                        <div class="h-4 rounded bg-[var(--border-subtle)] overflow-hidden shrink-0" style="width:150px">
+                          <div class="h-full rounded transition-all" :style="`width:${Math.max(2,Math.round(f.pctOverall*100))}%;background:${chartColor(fi+1)}`"></div>
+                        </div>
+                        <span class="tabular-nums font-medium" :title="f.count.toLocaleString()" x-text="formatAbbrev(f.count)"></span>
+                      </div>
+                    </td>
+                    <!-- % of the top of the funnel -->
+                    <td class="py-2.5 px-3 tabular-nums whitespace-nowrap" x-text="(f.pctOverall*100).toFixed(1)+'%'"></td>
+                    <!-- Continued: step-to-step conversion (share of the previous step who moved on) -->
+                    <td class="py-2.5 px-3 tabular-nums whitespace-nowrap" x-text="fi===0 ? '—' : (f.pctStep*100).toFixed(1)+'%'"></td>
+                    <!-- Dropped: ABSOLUTE lost since the previous step + the drop %, colour-graded by severity -->
+                    <td class="py-2.5 px-3 whitespace-nowrap">
+                      <span x-show="fi===0" class="text-[var(--muted-foreground)]">—</span>
+                      <span x-show="fi>0" class="inline-flex items-baseline gap-1.5">
+                        <span class="tabular-nums font-medium" :class="f.drop>0.5?'text-[var(--negative)]':f.drop>0.25?'text-[var(--warning)]':'text-[var(--foreground)]'" :title="f.lost.toLocaleString()+' lost'" x-text="'−'+formatAbbrev(f.lost)"></span>
+                        <span class="text-xs tabular-nums text-[var(--muted-foreground)]" x-text="'('+(f.drop*100).toFixed(0)+'%)'"></span>
+                      </span>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </section>
+        </div>
+      </template>

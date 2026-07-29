@@ -1,0 +1,122 @@
+<!--
+  COMPONENT: chat-panel
+  Purpose: Slide-in chat panel from the right edge (~440px wide). Header + greeting + message list + input + starter prompt chips.
+  Alpine scope expected:
+    chatOpen, chatMessages[], chatInput, chatProcessing, chatInvestigationId, chatStarters[],
+    plus methods chatSend(text), chatRetry(), chatCancel(), chatReset(), chatStarterClick(prompt).
+  Backend contract: POST /api/chat/start → poll → respond → cancel (see project-spec.md ## Chat Endpoints).
+  Auth: Mode 2 (cookie) only. In Mode 1 / synthetic mode, show "Chat requires deployed mode" placeholder.
+-->
+<aside x-show="chatOpen"
+       x-transition:enter="transition ease-out duration-200"
+       x-transition:enter-start="translate-x-full opacity-0"
+       x-transition:enter-end="translate-x-0 opacity-100"
+       x-transition:leave="transition ease-in duration-150"
+       x-transition:leave-start="translate-x-0 opacity-100"
+       x-transition:leave-end="translate-x-full opacity-0"
+       class="fixed top-0 right-0 bottom-0 w-[440px] max-w-[90vw] z-40 bg-[var(--surface-elevated)] border-l border-[var(--border)] shadow-xl flex flex-col"
+       aria-label="Chat panel"
+       role="dialog">
+
+  <!-- Header -->
+  <div class="px-4 py-3 border-b border-[var(--border)] flex items-start gap-3">
+    <div class="w-8 h-8 rounded-full bg-gradient-to-br from-[var(--chart-5)] to-[var(--primary)] flex items-center justify-center shrink-0">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+      </svg>
+    </div>
+    <div class="flex-1 min-w-0">
+      <div class="text-sm font-semibold">Ask me anything!</div>
+      <div class="text-xs text-[var(--muted-foreground)]">Grounded in this project's data</div>
+    </div>
+    <button @click="chatOpen = false" class="text-[var(--muted-foreground)] hover:text-[var(--negative)] -mt-0.5" aria-label="Close chat">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  </div>
+
+  <!-- Message list (scrollable) -->
+  <div class="flex-1 overflow-y-auto px-4 py-4 space-y-3" x-ref="chatScroll">
+
+    <!-- Empty-state greeting (when no messages yet) -->
+    <template x-if="chatMessages.length === 0">
+      <div class="text-center py-6">
+        <div class="w-16 h-16 rounded-full bg-gradient-to-br from-[var(--chart-5)] to-[var(--primary)] flex items-center justify-center mx-auto mb-3">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            <circle cx="9" cy="10" r="0.8" fill="white"/>
+            <circle cx="15" cy="10" r="0.8" fill="white"/>
+            <path d="M9 14c.83.67 1.83 1 3 1s2.17-.33 3-1" stroke-width="1.5"/>
+          </svg>
+        </div>
+        <div class="text-base font-semibold mb-2">Hey! 👋</div>
+        <p class="text-sm text-[var(--muted-foreground)] max-w-[300px] mx-auto leading-relaxed">
+          Ask me about your dashboard — KPI shifts, segment differences, anomalies, or what changed since last week.
+        </p>
+      </div>
+    </template>
+
+    <!-- Messages -->
+    <template x-for="msg in chatMessages" :key="msg.id">
+      <div :class="msg.role === 'user' ? 'flex justify-end' : 'flex justify-start'">
+        <div :class="msg.role === 'user'
+          ? 'bg-[var(--primary)] text-white max-w-[80%] px-3 py-2 rounded-2xl rounded-br-md text-sm'
+          : 'bg-[var(--surface)] text-[var(--foreground)] max-w-[85%] px-3 py-2 rounded-2xl rounded-bl-md text-sm border border-[var(--border-subtle)]'">
+          <template x-if="msg.kind === 'message'">
+            <div x-html="msg.html || msg.text" class="chat-html"></div>
+          </template>
+          <template x-if="msg.kind === 'processing_message'">
+            <div class="text-xs text-[var(--muted-foreground)] flex items-center gap-2">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="animate-spin">
+                <line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/>
+              </svg>
+              <span x-text="msg.text"></span>
+            </div>
+          </template>
+        </div>
+      </div>
+    </template>
+
+    <!-- Processing indicator (current in-flight) -->
+    <template x-if="chatProcessing">
+      <div class="flex justify-start">
+        <div class="bg-[var(--surface)] px-3 py-2 rounded-2xl rounded-bl-md text-xs text-[var(--muted-foreground)] border border-[var(--border-subtle)] flex items-center gap-2">
+          <span class="flex gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-[var(--muted-foreground)] animate-bounce" style="animation-delay: 0s"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-[var(--muted-foreground)] animate-bounce" style="animation-delay: 0.15s"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-[var(--muted-foreground)] animate-bounce" style="animation-delay: 0.3s"></span>
+          </span>
+          <span>Thinking…</span>
+        </div>
+      </div>
+    </template>
+  </div>
+
+  <!-- Input area -->
+  <div class="border-t border-[var(--border)] p-3 space-y-2">
+    <div class="flex items-end gap-2">
+      <textarea x-model="chatInput"
+                @keydown.enter.prevent="if (!$event.shiftKey) { chatSend(chatInput); }"
+                placeholder="Ask me anything…"
+                rows="1"
+                class="flex-1 px-3 py-2 text-sm rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20 outline-none resize-none max-h-[120px]"></textarea>
+      <button @click="chatSend(chatInput)"
+              :disabled="!chatInput.trim() || chatProcessing"
+              :class="(!chatInput.trim() || chatProcessing) ? 'opacity-50 cursor-not-allowed' : ''"
+              class="px-3 py-2 rounded-lg bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white text-sm font-medium flex items-center gap-1.5">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        Send
+      </button>
+    </div>
+
+    <!-- Starter prompt chips (only when no messages yet) -->
+    <template x-if="chatMessages.length === 0 && chatStarters.length > 0">
+      <div class="flex flex-wrap gap-1.5 pt-1">
+        <template x-for="prompt in chatStarters" :key="prompt">
+          <button @click="chatStarterClick(prompt)"
+                  class="text-xs px-2 py-1 rounded-lg border border-[var(--border)] text-[var(--muted-foreground)] hover:text-[var(--primary)] hover:border-[var(--primary)] text-left"
+                  x-text="prompt"></button>
+        </template>
+      </div>
+    </template>
+  </div>
+</aside>

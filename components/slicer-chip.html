@@ -1,0 +1,108 @@
+<!--
+  COMPONENT: slicer-chip
+  Purpose: Categorical chip slicer body. Values render as clickable button chips (not checkboxes).
+  Selected chips are filled with the primary color; unselected have a surface background + border.
+  Shows per-value count next to the label when slicerValueCounts[field] is populated.
+  Shift-click does range-select between the last selected value and the newly-clicked value.
+  Above 12 values, a search input is shown; above 50 values, only the top 50 render with a "Show all" toggle.
+
+  Alpine scope expected:
+    s                       current open slicer object { id, scope, ... }
+    slicerLabels{}          field -> { label, type }
+    slicerValues{}          field -> string[] (the distinct values to render as chips)
+    slicerValueCounts{}     (optional) field -> { value: count } — when present, each chip shows the count
+    slicerLoading{}         (optional) field -> bool — when true, shows "Loading values…" line
+    filters                 the 4-scope filter state
+    Methods: replaceFilter(scope, rule, widgetId?), removeFilter(scope, field, widgetId?, op?)
+    Module-local helper expected (defined in the starter's factory):
+      slicerHandleClick(s, value, shift)  // wraps replaceFilter; handles shift-range-select internally
+-->
+<div class="flex flex-col h-full max-h-[420px]"
+     x-data="{
+       q: '',
+       showAll: false,
+       get rule() {
+         const list = s.scope === 'widget' && s.widgetId
+           ? (filters.widget[s.widgetId] || [])
+           : (filters[s.scope] || []);
+         return list.find(r => r.field === s.id && r.op === 'in');
+       },
+       get selected() { return new Set((this.rule && this.rule.values || []).map(String)); },
+       get values() { return slicerValues[s.id] || []; },
+       get counts() { return (typeof slicerValueCounts === 'object' && slicerValueCounts && slicerValueCounts[s.id]) || null; },
+       get filtered() {
+         if (!this.q) return this.values;
+         const q = this.q.toLowerCase();
+         return this.values.filter(v => String(v).toLowerCase().includes(q));
+       },
+       get visible() { return this.showAll ? this.filtered : this.filtered.slice(0, 50); },
+       isLoading() { return !!(typeof slicerLoading === 'object' && slicerLoading && slicerLoading[s.id]); },
+       fmtCount(v) {
+         if (!this.counts) return null;
+         const n = this.counts[v];
+         if (n == null) return null;
+         if (n >= 1000) return (n / 1000).toFixed(n >= 10000 ? 0 : 1) + 'k';
+         return String(n);
+       },
+       clearAllForField() { removeFilter(s.scope, s.id, s.widgetId || null, 'in'); }
+     }">
+
+  <!-- Header: label · count · Clear -->
+  <div class="px-3 pt-2.5 pb-2 flex items-center gap-2 border-b border-[var(--border-subtle)]">
+    <template x-if="s.scope === 'widget'">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" class="text-[var(--chip-widget)]"
+           aria-label="this widget only">
+        <path d="M12 1a5 5 0 0 1 5 5v4h1a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V12a2 2 0 0 1 2-2h1V6a5 5 0 0 1 5-5zm0 2a3 3 0 0 0-3 3v4h6V6a3 3 0 0 0-3-3z"/>
+      </svg>
+    </template>
+    <div class="text-sm font-semibold" x-text="(slicerLabels[s.id] && slicerLabels[s.id].label) || s.id"></div>
+    <div class="text-[10px] text-[var(--muted-foreground)] tabular-nums" x-text="values.length"></div>
+    <button @click="clearAllForField()" class="ml-auto text-xs text-[var(--muted-foreground)] hover:text-[var(--negative)]">Clear</button>
+  </div>
+
+  <!-- Search (only when > 12 values) -->
+  <template x-if="values.length > 12">
+    <div class="px-3 pt-2 pb-1 flex items-center gap-2 border-b border-[var(--border-subtle)]">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-[var(--placeholder)]"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input x-model="q" type="search" :placeholder="'Filter ' + values.length + ' values…'"
+             class="flex-1 text-xs h-7 bg-transparent outline-none">
+    </div>
+  </template>
+
+  <!-- Chip wrap -->
+  <div class="flex-1 overflow-y-auto p-2">
+    <template x-if="isLoading() && values.length === 0">
+      <div class="px-1 py-2 text-[11px] italic text-[var(--muted-foreground)]">Loading values…</div>
+    </template>
+    <template x-if="!isLoading() && values.length === 0">
+      <div class="px-1 py-2 text-[11px] italic text-[var(--muted-foreground)]">No values for this field in the selected window.</div>
+    </template>
+
+    <div class="flex flex-wrap gap-1.5">
+      <template x-for="v in visible" :key="v">
+        <button @click="slicerHandleClick(s, v, $event.shiftKey)"
+                :class="selected.has(String(v))
+                  ? 'bg-[var(--primary)] text-white border-[var(--primary)]'
+                  : 'bg-[var(--surface)] text-[var(--foreground)] border-[var(--border)] hover:border-[var(--primary)]'"
+                class="flex items-center gap-1.5 h-7 px-2 rounded-md text-xs font-medium border transition-colors">
+          <span x-text="v"></span>
+          <template x-if="fmtCount(v)">
+            <span :class="selected.has(String(v)) ? 'text-white/80' : 'text-[var(--muted-foreground)]'"
+                  class="text-[10px] tabular-nums" x-text="fmtCount(v)"></span>
+          </template>
+        </button>
+      </template>
+    </div>
+
+    <template x-if="filtered.length > 50">
+      <button @click="showAll = !showAll" class="mt-2 text-xs text-[var(--primary)] hover:underline"
+              x-text="showAll ? 'Show top 50' : 'Show all ' + filtered.length"></button>
+    </template>
+  </div>
+
+  <!-- Footer: Selected count + Select visible -->
+  <div class="border-t border-[var(--border-subtle)] px-3 py-2 flex items-center justify-between text-xs text-[var(--muted-foreground)]">
+    <div>Selected: <span class="text-[var(--foreground)] font-medium tabular-nums" x-text="selected.size"></span> of <span class="tabular-nums" x-text="values.length"></span></div>
+    <button @click="slicerSelectVisible(s, visible)" class="text-[var(--primary)] hover:underline">Select visible</button>
+  </div>
+</div>

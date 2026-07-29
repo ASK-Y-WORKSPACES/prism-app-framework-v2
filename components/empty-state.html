@@ -1,0 +1,18 @@
+<!--
+  COMPONENT: empty-state
+  Purpose: Empty state inside any card whose data array is empty after filters.
+  Alpine scope expected: any parent with clearAll() / drillBack() methods (optional).
+  Usage: drop inside <template x-if="rows.length === 0 && !loading">.
+-->
+<div role="status" class="p-8 flex flex-col items-center text-center">
+  <svg aria-hidden="true" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-[var(--muted-foreground)] mb-3">
+    <rect x="3" y="3" width="18" height="18" rx="2"/>
+    <line x1="3" y1="9" x2="21" y2="9"/>
+  </svg>
+  <h2 class="text-sm font-semibold">No data for the current filters</h2>
+  <p class="mt-1 text-sm text-[var(--muted-foreground)] max-w-prose">Try widening the date range or removing a filter.</p>
+  <div class="mt-4 flex items-center gap-2">
+    <button @click="clearAll && clearAll()" class="text-xs px-3 py-1.5 rounded-lg border border-[var(--border)] hover:border-[var(--primary)] hover:text-[var(--primary)]">Clear all filters</button>
+    <button @click="drillBack && drillBack()" x-show="drillHistory && drillHistory.length > 0" class="text-xs px-3 py-1.5 rounded-lg border border-[var(--border)] hover:border-[var(--primary)] hover:text-[var(--primary)]">↶ Back one drill</button>
+  </div>
+</div>

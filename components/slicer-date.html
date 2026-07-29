@@ -1,0 +1,39 @@
+<!--
+  COMPONENT: slicer-date
+  Purpose: Date range picker — preset row + custom from/to inputs.
+  Alpine scope expected: range (from, to, preset), plus presetRange() helper in module scope.
+  Usage: inside SlicerPanel card body when slicerLabels[s.id].type === 'date'.
+-->
+<div class="p-3 space-y-3">
+
+  <!-- Preset row -->
+  <div class="flex flex-wrap gap-1.5">
+    <template x-for="p in [['today','Today'],['yesterday','Yesterday'],['last_7d','Last 7d'],['last_14d','Last 14d'],['last_30d','Last 30d'],['last_60d','Last 60d'],['last_90d','Last 90d'],['last_12m','Last 12m'],['mtd','MTD'],['qtd','QTD'],['ytd','YTD'],['all_time','All time']]" :key="p[0]">
+      <button @click="range = presetRange(p[0]); loadAll()"
+              :class="range.preset === p[0] ? 'bg-[var(--primary)] text-white border-[var(--primary)]' : 'border-[var(--border)] text-[var(--muted-foreground)] hover:border-[var(--primary)] hover:text-[var(--primary)]'"
+              class="px-2 py-1 text-[11px] rounded-md border bg-[var(--surface-elevated)]"
+              x-text="p[1]"></button>
+    </template>
+  </div>
+
+  <div class="border-t border-[var(--border-subtle)] pt-3 space-y-2">
+    <!-- Calendar-aligned vs rolling (cosmetic in v1) -->
+    <label class="flex items-center gap-2 text-xs text-[var(--muted-foreground)] cursor-pointer">
+      <input type="checkbox" x-model="calendarMode" class="accent-[var(--primary)]">
+      <span>Calendar mode (e.g. MTD instead of Last 30d rolling)</span>
+    </label>
+
+    <!-- Custom -->
+    <div class="flex items-center gap-2">
+      <input type="date"
+             :value="new Date(range.from).toISOString().slice(0,10)"
+             @change="range = { from: new Date($event.target.value).getTime(), to: range.to, preset: 'custom' }; loadAll()"
+             class="flex-1 px-2 py-1.5 text-sm rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] focus:border-[var(--primary)] outline-none">
+      <span class="text-xs text-[var(--muted-foreground)]">to</span>
+      <input type="date"
+             :value="new Date(range.to - 86400000).toISOString().slice(0,10)"
+             @change="range = { from: range.from, to: new Date($event.target.value).getTime() + 86400000, preset: 'custom' }; loadAll()"
+             class="flex-1 px-2 py-1.5 text-sm rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] focus:border-[var(--primary)] outline-none">
+    </div>
+  </div>
+</div>

@@ -1,0 +1,7 @@
+    opt:{ sources:[], entities:[], recs:[], batches:[], seq:1, avgCpa:0, fresh:{}, dismissed:{}, muted:{}, _hydrated:false, autoStage:false,
+      collapsed:{ assistant:false, recs:false, campaigns:false, editor:false, history:false },
+      stagingOpen:false, histOpen:{}, dismissRec:null, dismissReason:'', dismissNote:'',
+      con:{ input:'', thread:[], open:true },
+      selected:{}, search:'', chip:'All',
+      bulk:{ status:'', budget:'', bid:'', daypart:'', negatives:'', freqcap:'' }, bulkFrom:null,
+      cs:{ open:false, entityId:null, ctx:null, ctxLoading:false, genBusy:false, genErr:null, variants:null, sel:0, edited:{headline:'',primaryText:'',description:''}, phase:'edit', applyBusy:false, applyErr:null } },

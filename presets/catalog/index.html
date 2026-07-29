@@ -1,0 +1,2235 @@
+<!doctype html>
+<!--
+  ════════════════════════════════════════════════════════════════════════════
+  Prism App Framework v2 — Dashboard starter (config-driven, multi-tab)
+  ────────────────────────────────────────────────────────────────────────────
+  This is a WORKING reference app. Open it directly in a browser (synthetic mode)
+  to see the chrome + every section render before any agent edits.
+
+  To build a real app: fill APP_CONFIG (one object, bottom of <script>). Each
+  `sections[]` entry is a tab with its own layout / KPIs / charts / table / source.
+  You do NOT hand-author per-section HTML — the generic renderer below does it.
+  ════════════════════════════════════════════════════════════════════════════
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__APP_NAME__</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/focus@3.x.x/dist/cdn.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+<style>
+  :root {
+    --font-sans: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    --background:#ffffff; --surface:#f8f9fb; --surface-elevated:#ffffff;
+    --border:#e5e9ef; --border-subtle:#f0f2f5; --border-strong:#b8c0cd;
+    --foreground:#1a2035; --muted-foreground:#6b7694; --placeholder:#9aa3be;
+    --primary:#4361ee; --primary-light:#eef0fd; --primary-hover:#3451d1;
+    --positive:#2ec4b6; --positive-light:#e8faf8; --negative:#e63946; --negative-light:#fdecea;
+    --warning:#f4a261; --warning-light:#fef3e8; --neutral:#8d99ae; --neutral-light:#f0f2f5;
+    --info:#4895ef; --info-light:#eaf3fe;
+    --sidebar-bg:#ffffff; --sidebar-border:#e5e9ef; --sidebar-item-hover:#f5f6fa;
+    --sidebar-item-active:#eef0fd; --sidebar-active-text:#4361ee; --sidebar-text:#3d4764; --sidebar-icon:#6b7694;
+    --topbar-bg:#eef0f4; --topbar-border:#e5e9ef;
+    /* Per-chart palettes — variety BETWEEN charts, consistency WITHIN a category */
+    --chart-1:#4361ee; --chart-2:#2ec4b6; --chart-3:#f4a261; --chart-4:#e63946; --chart-5:#9b5de5; --chart-6:#8d99ae;
+    --chip-global:#4361ee; --chip-widget:#9b5de5; --chip-drill:#f4a261; --chip-chat:#2ec4b6;
+  }
+  * { font-family: var(--font-sans); }
+  body { background: var(--surface); color: var(--foreground); margin:0; }
+  [x-cloak]{ display:none !important; }
+  .tabular-nums{ font-variant-numeric: tabular-nums; }
+  @keyframes skel-pulse{0%,100%{opacity:1}50%{opacity:.55}}
+  .skel{ animation:skel-pulse 1.4s ease-in-out infinite; background:var(--border-subtle); border-radius:6px; }
+  /* flash a search hit when you jump to it */
+  @keyframes search-flash{0%{background:var(--primary-light);box-shadow:0 0 0 3px var(--primary-light)}100%{background:transparent;box-shadow:0 0 0 3px transparent}}
+  .search-flash{ animation:search-flash 1.8s ease-out; border-radius:6px; }
+  .chip-stripe-global{ box-shadow: inset 2px 0 0 var(--chip-global); }
+  .chip-stripe-widget{ box-shadow: inset 2px 0 0 var(--chip-widget); }
+  .chip-stripe-drill { box-shadow: inset 2px 0 0 var(--chip-drill); }
+  .chip-stripe-chat  { box-shadow: inset 2px 0 0 var(--chip-chat); }
+  .widget-local-stripe{ box-shadow: inset 2px 0 0 var(--chip-widget); }
+  @keyframes tp-slide{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
+  .tp-track{ position:fixed; top:0; left:0; right:0; height:2px; z-index:100; overflow:hidden; pointer-events:none; }
+  .tp-fill{ width:40%; height:100%; background:linear-gradient(90deg,transparent,var(--primary),transparent); animation:tp-slide 1.1s linear infinite; }
+  @keyframes dots{0%,80%,100%{opacity:.25}40%{opacity:1}}
+  .dot{ animation:dots 1.2s infinite both; }
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .spin{ display:inline-block; border:2px solid var(--border); border-top-color:var(--primary); border-radius:50%; animation:spin .7s linear infinite; }
+  /* metric tooltip — immediate (no native title= delay); every metric explains itself here */
+  .mtip{ position:fixed; z-index:90; max-width:290px; padding:8px 10px; border-radius:8px;
+    background:var(--surface-elevated); border:1px solid var(--border); box-shadow:0 4px 14px rgba(0,0,0,.10);
+    font-size:12px; line-height:1.45; color:var(--foreground);
+    pointer-events:auto; user-select:text; -webkit-user-select:text; cursor:text; }  /* hoverable → the text can be selected & copied */
+  .mtip b{ font-weight:600; }
+  .mtip .src{ color:var(--muted-foreground); }
+  /* rich chat answers — the Asky agent returns HTML; render it (sanitized) instead of showing tags */
+  .chat-rich{ line-height:1.5; }
+  .chat-rich h1,.chat-rich h2,.chat-rich h3,.chat-rich h4{ font-weight:600; margin:.5rem 0 .25rem; line-height:1.3; }
+  .chat-rich h3{ font-size:.95rem; } .chat-rich h4{ font-size:.85rem; }
+  .chat-rich p{ margin:.35rem 0; }
+  .chat-rich ul,.chat-rich ol{ margin:.35rem 0; padding-left:1.15rem; } .chat-rich li{ margin:.12rem 0; }
+  .chat-rich table{ border-collapse:collapse; width:100%; margin:.45rem 0; font-size:.78rem; }
+  .chat-rich th,.chat-rich td{ border:1px solid var(--border); padding:.2rem .45rem; text-align:left; }
+  .chat-rich th{ background:var(--surface); font-weight:600; }
+  .chat-rich code{ background:var(--surface); padding:0 .25rem; border-radius:3px; font-size:.82em; }
+  .chat-rich pre{ background:var(--surface); padding:.5rem; border-radius:6px; overflow-x:auto; }
+  .chat-rich a{ color:var(--primary); text-decoration:underline; }
+  .chat-rich strong,.chat-rich b{ font-weight:600; }
+  .chat-rich blockquote{ border-left:3px solid var(--border); margin:.4rem 0; padding-left:.6rem; color:var(--muted-foreground); }
+  ::-webkit-scrollbar{ width:10px; height:10px; }
+  ::-webkit-scrollbar-thumb{ background:var(--border); border-radius:6px; }
+  button:focus-visible,a:focus-visible,input:focus-visible,[role=button]:focus-visible{
+    outline:2px solid var(--primary); outline-offset:2px; border-radius:4px; }
+</style>
+</head>
+<body x-data="app()" x-init="init()" x-cloak class="text-sm">
+
+<!-- top progress -->
+<div class="tp-track" x-show="loading" x-transition><div class="tp-fill"></div></div>
+
+<!-- metric tooltip (immediate) — what it is · how it's calculated · which source -->
+<div class="mtip" x-show="tip.show" x-html="tip.html" :style="{ left: tip.x+'px', top: tip.y+'px' }" @mouseenter="tipEnter()" @mouseleave="hideTip()" x-cloak></div>
+
+<!-- ══ SIDEBAR ══ -->
+<aside class="fixed left-0 top-0 h-screen z-40 bg-[var(--sidebar-bg)] border-r border-[var(--sidebar-border)] flex flex-col transition-all duration-200"
+       :class="sidebarOpen ? 'w-[220px]' : 'w-[60px]'">
+  <div class="min-h-[56px] flex items-center gap-2.5 px-3 py-2 border-b border-[var(--border-subtle)]">
+    <!-- logo: uses APP_CONFIG.logo image when set, else the initial; click expands a collapsed sidebar -->
+    <button @click="!sidebarOpen && (sidebarOpen=true)" :class="sidebarOpen?'cursor-default':'cursor-pointer'" :title="sidebarOpen?'':'Expand sidebar'"
+      class="w-8 h-8 shrink-0 rounded-lg overflow-hidden bg-[var(--primary)] text-white flex items-center justify-center font-semibold">
+      <template x-if="appLogo"><img :src="appLogo" :alt="appName" class="w-full h-full object-cover"></template>
+      <template x-if="!appLogo"><span x-text="appInitial"></span></template>
+    </button>
+    <div x-show="sidebarOpen" class="min-w-0 flex-1">
+      <div class="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)] leading-none">Analytics</div>
+      <!-- full app name; wraps to a second line instead of truncating -->
+      <div class="text-sm font-semibold leading-tight break-words" x-text="appName"></div>
+    </div>
+  </div>
+  <nav class="flex-1 overflow-y-auto py-3 px-2">
+    <div x-show="sidebarOpen" class="px-3 mt-0 mb-3 text-[10px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">Workspace</div>
+    <template x-for="s in sections" :key="s.id">
+      <button @click="navigate(s.id)"
+        class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+        :class="section===s.id ? 'bg-[var(--sidebar-item-active)] text-[var(--sidebar-active-text)]' : 'text-[var(--sidebar-text)] hover:bg-[var(--sidebar-item-hover)]'">
+        <span class="shrink-0" x-html="icon(s.icon)" :class="section===s.id ? 'text-[var(--primary)]' : 'text-[var(--sidebar-icon)]'"></span>
+        <span x-show="sidebarOpen" x-text="s.label" class="truncate"></span>
+      </button>
+    </template>
+  </nav>
+  <div class="border-t border-[var(--border-subtle)] p-2.5 flex items-center gap-2 text-xs text-[var(--muted-foreground)]">
+    <!-- Expanded: "Powered by Ask-Y" (cube + wordmark). Collapsed: just the cube. -->
+    <div x-show="sidebarOpen" class="flex items-center gap-1.5 min-w-0">
+      <span class="shrink-0">Powered by</span>
+      <span class="shrink-0 inline-flex" x-html="askyLogo"></span>
+    </div>
+    <span x-show="!sidebarOpen" class="inline-flex" x-html="askyCube" :title="'Powered by Ask-Y'"></span>
+    <button @click="sidebarOpen=!sidebarOpen" :title="sidebarOpen?'Collapse sidebar':'Expand sidebar'" class="ml-auto w-7 h-7 rounded-lg flex items-center justify-center hover:bg-[var(--surface)]" x-html="sidebarOpen ? icon('collapse') : icon('expand')"></button>
+  </div>
+</aside>
+
+<!-- ══ HEADER ══ -->
+<header class="fixed top-0 right-0 z-30 h-[56px] flex items-center gap-3 px-4 bg-[var(--topbar-bg)] border-b border-[var(--topbar-border)] transition-all duration-200"
+        :style="`left:${sidebarOpen?220:60}px;right:${chatOpen?440:0}px`">
+  <h1 class="text-base font-semibold tracking-tight" x-text="currentSection().label"></h1>
+  <!-- Loading indicator only. (The "data through <date>" freshness badge was removed for now.) -->
+  <div class="flex items-center gap-1.5 text-xs text-[var(--muted-foreground)]" x-show="loading">
+    <span class="spin w-3.5 h-3.5"></span><span>Loading…</span>
+  </div>
+  <div class="flex-1"></div>
+  <button @click="paletteMode='search'; commandPaletteOpen=true" class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--surface-elevated)] border border-[var(--border)] text-sm text-[var(--placeholder)] hover:border-[var(--primary)] hover:text-[var(--foreground)] min-w-[200px]">
+    <span x-html="icon('search')"></span><span class="flex-1 text-left">Search…</span><kbd class="text-[10px] px-1 py-0.5 rounded border border-[var(--border)]">⌘K</kbd>
+  </button>
+  <div class="w-7 h-7 rounded-full bg-[var(--primary)] text-white flex items-center justify-center text-xs font-semibold">Y</div>
+</header>
+
+<!-- ══ MAIN ══ -->
+<main class="min-h-screen pt-[56px] transition-all duration-200" :style="`padding-left:${sidebarOpen?220:60}px;padding-right:${chatOpen?440:0}px`">
+
+  <!-- Filter bar (global) -->
+  <div class="sticky top-[56px] z-20 bg-[var(--surface)]/95 backdrop-blur border-b border-[var(--border)] px-6 py-2 flex flex-wrap items-center gap-2">
+    <div x-show="!hideDate" class="relative">
+      <div class="flex rounded-lg border border-[var(--border)] overflow-hidden">
+        <template x-for="p in ['all_time','last_7d','last_30d','ytd']" :key="p">
+          <button @click="setPreset(p)" class="px-3 py-1.5 text-xs font-medium border-l first:border-l-0 border-[var(--border)]"
+            :class="range.preset===p ? 'bg-[var(--primary)] text-white' : 'text-[var(--foreground)] hover:bg-[var(--surface)]'" x-text="presetLabel(p)"></button>
+        </template>
+        <button @click="openCustomRange()" title="Pick an exact date range" class="px-3 py-1.5 text-xs font-medium border-l border-[var(--border)] flex items-center gap-1.5"
+          :class="range.preset==='custom' ? 'bg-[var(--primary)] text-white' : 'text-[var(--foreground)] hover:bg-[var(--surface)]'">
+          <span x-html="icon('calendar')"></span><span x-text="range.preset==='custom' ? rangeLabel() : 'Custom'"></span>
+        </button>
+      </div>
+      <!-- Visual calendar range picker: click a start day then an end day (the range highlights),
+           then Apply. Start/End fields show the current selection; the active one is outlined. -->
+      <div x-show="customRangeOpen" x-cloak @click.outside="customRangeOpen=false" x-transition class="absolute left-0 top-full mt-1.5 z-40 w-72 p-3 rounded-xl bg-[var(--surface-elevated)] border border-[var(--border)] shadow-lg">
+        <div class="flex items-stretch gap-2 mb-3">
+          <div class="flex-1 px-2.5 py-1.5 rounded-lg border" :class="crPicking==='start' ? 'border-[var(--primary)] ring-1 ring-[var(--primary)]' : 'border-[var(--border)]'">
+            <div class="text-[9px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">Start date</div>
+            <div class="text-sm tabular-nums" x-text="customFrom ? crLabel(customFrom) : '—'"></div>
+          </div>
+          <div class="flex items-center text-[var(--muted-foreground)]">–</div>
+          <div class="flex-1 px-2.5 py-1.5 rounded-lg border" :class="crPicking==='end' ? 'border-[var(--primary)] ring-1 ring-[var(--primary)]' : 'border-[var(--border)]'">
+            <div class="text-[9px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">End date</div>
+            <div class="text-sm tabular-nums" x-text="customTo ? crLabel(customTo) : '—'"></div>
+          </div>
+        </div>
+        <div class="flex items-center justify-between mb-1">
+          <button @click="crPrev()" class="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--muted-foreground)] hover:bg-[var(--surface)] hover:text-[var(--foreground)]"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
+          <span class="text-sm font-semibold" x-text="crTitle()"></span>
+          <button @click="crNext()" class="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--muted-foreground)] hover:bg-[var(--surface)] hover:text-[var(--foreground)]"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></button>
+        </div>
+        <div class="grid grid-cols-7 text-center text-[10px] font-medium text-[var(--muted-foreground)] mb-1">
+          <template x-for="(d,i) in ['S','M','T','W','T','F','S']" :key="i"><span x-text="d"></span></template>
+        </div>
+        <div class="grid grid-cols-7 gap-y-0.5 text-center">
+          <template x-for="(cell,i) in crGrid()" :key="i">
+            <div class="py-0.5 flex items-center justify-center" :class="crInRange(cell.iso) ? 'bg-[var(--primary-light)]' : ''">
+              <template x-if="cell.iso">
+                <button @click="crPick(cell.iso)"
+                  class="w-8 h-8 rounded-full text-xs tabular-nums flex items-center justify-center transition-colors"
+                  :class="(crIsStart(cell.iso)||crIsEnd(cell.iso)) ? 'bg-[var(--primary)] text-white font-semibold' : (crInRange(cell.iso) ? 'text-[var(--primary)]' : 'hover:bg-[var(--surface)]')"
+                  x-text="cell.day"></button>
+              </template>
+            </div>
+          </template>
+        </div>
+        <div class="flex items-center justify-end gap-1 mt-3 pt-2 border-t border-[var(--border-subtle)]">
+          <button @click="customRangeOpen=false" class="px-3 py-1.5 text-xs font-medium rounded-lg text-[var(--muted-foreground)] hover:bg-[var(--surface)]">Cancel</button>
+          <button @click="applyCustomRange()" :disabled="!customFrom||!customTo" class="px-3 py-1.5 text-xs font-semibold rounded-lg text-[var(--primary)] hover:bg-[var(--primary-light)] disabled:opacity-40 disabled:cursor-not-allowed">Apply</button>
+        </div>
+      </div>
+    </div>
+    <div x-show="!hideDate" class="w-px h-5 bg-[var(--border)]"></div>
+    <template x-for="s in pinnedGlobalSlicers()" :key="s.id">
+      <button @click="toggleSlicer(s.id,'global')" class="px-3 py-1.5 rounded-lg border text-xs font-medium"
+        :class="isSlicerOpen(s.id) ? 'border-[var(--primary)] text-[var(--primary)] bg-[var(--primary-light)]' : 'border-[var(--border)] hover:border-[var(--primary)]'" x-text="s.label"></button>
+    </template>
+    <button @click="paletteMode='filter'; commandPaletteOpen=true" class="px-3 py-1.5 rounded-lg border border-dashed border-[var(--border)] text-xs text-[var(--muted-foreground)] hover:border-[var(--primary)] hover:text-[var(--primary)]">+ Add filter</button>
+    <div class="flex-1"></div>
+    <button x-show="activeFilterCount()>0" @click="clearAll()" class="text-xs px-2.5 py-1.5 rounded-lg text-[var(--negative)] hover:bg-[var(--negative-light)]" x-text="`Clear all (${activeFilterCount()})`"></button>
+    <button @click="resetAll()" title="Reset filters and date range to defaults" class="text-xs px-2.5 py-1.5 rounded-lg border border-[var(--border)] hover:border-[var(--primary)]">Reset</button>
+  </div>
+
+  <!-- Active filter chips -->
+  <div x-show="allChips().length" class="px-6 pt-3 flex flex-wrap items-center gap-2">
+    <span class="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">Filters</span>
+    <template x-for="c in allChips()" :key="c.scope+c.field">
+      <span class="inline-flex items-center gap-1 pl-2.5 pr-1 py-1 rounded-lg bg-[var(--surface-elevated)] border border-[var(--border)] text-xs"
+            :class="'chip-stripe-'+c.scope">
+        <span x-text="c.text"></span>
+        <!-- include/exclude toggle (global filters): = includes, ≠ excludes -->
+        <button x-show="c.scope==='global'" @click="toggleChipOp(c)" :title="c.op==='not_in' ? 'Excluding these — click to include' : 'Including these — click to exclude'"
+          class="w-5 h-4 rounded text-[11px] font-semibold flex items-center justify-center hover:bg-[var(--surface)]"
+          :class="c.op==='not_in' ? 'text-[var(--negative)]' : 'text-[var(--muted-foreground)]'" x-text="c.op==='not_in' ? '≠' : '='"></button>
+        <button @click="removeFilter(c.scope,c.field)" class="w-4 h-4 rounded flex items-center justify-center hover:bg-[var(--surface)]" x-html="icon('x')"></button>
+      </span>
+    </template>
+  </div>
+
+  <!-- error banner -->
+  <div x-show="error" class="mx-6 mt-4 p-3 rounded-lg bg-[var(--negative-light)] border border-[var(--negative)] text-sm text-[var(--negative)] flex items-start gap-2">
+    <span x-html="icon('warning')"></span><span class="flex-1" x-text="error"></span>
+    <button @click="error=null" x-html="icon('x')"></button>
+  </div>
+
+  <!-- ══ GENERIC SECTION RENDERER — one block renders every tab from config ══ -->
+  <template x-for="sec in sections" :key="sec.id">
+    <div x-show="section===sec.id" :data-sec-search="sec.id" class="px-6 pt-5 pb-10 space-y-6">
+
+      <!-- subtitle: per-tab "what this measures + how broken down" -->
+      <p class="text-sm text-[var(--muted-foreground)] -mt-1" x-text="sec.subtitle"></p>
+
+      <!-- KPI strip (every layout that declares kpis) -->
+      <div x-show="sec.kpis && sec.kpis.length" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <template x-for="(k,ki) in (sec.kpis||[])" :key="ki">
+          <div class="bg-[var(--surface-elevated)] border border-[var(--border)] rounded-xl shadow-sm p-4 flex flex-col gap-2">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)]" x-text="k.label"></span>
+              <button class="w-6 h-6 rounded flex items-center justify-center text-[var(--muted-foreground)] hover:bg-[var(--surface)] hover:text-[var(--primary)]" @mouseenter="showTip($event, metricTipHtml(k.label, kpiTooltip(k), k.source))" @mousemove="moveTip($event)" @mouseleave="hideTip()" x-html="icon('info')"></button>
+            </div>
+            <div class="flex items-end gap-2">
+              <span class="text-2xl font-bold tabular-nums cursor-help" @mouseenter="k._exact && showTip($event, metricTipHtml(k.label, 'Exact: '+k._exact, k.source))" @mousemove="moveTip($event)" @mouseleave="hideTip()" x-text="k._val ?? '—'"></span>
+              <span x-show="k._delta!=null" class="flex items-center gap-0.5 text-xs font-semibold mb-1 tabular-nums cursor-help"
+                    :class="deltaGood(k) ? 'text-[var(--positive)]' : 'text-[var(--negative)]'"
+                    @mouseenter="showTip($event, deltaTipHtml(k))" @mousemove="moveTip($event)" @mouseleave="hideTip()">
+                <span x-html="(k._delta>=0)?icon('arrowup'):icon('arrowdown')"></span><span x-text="Math.abs(k._delta||0).toFixed(1)+'%'"></span>
+              </span>
+            </div>
+            <div class="h-9 -mx-1" :id="`spark-${sec.id}-${ki}`"></div>
+          </div>
+        </template>
+      </div>
+
+
+      <!-- charts (kpi-grid hero + breakdown-grid + comparison small-multiples) -->
+      <template x-if="sec.charts && sec.charts.length">
+        <div :class="['breakdown-grid','comparison'].includes(sec.layout) ? 'grid grid-cols-1 lg:grid-cols-2 gap-4' : 'space-y-6'">
+          <template x-for="(c,ci) in sec.charts" :key="ci">
+            <section class="bg-[var(--surface-elevated)] border border-[var(--border)] rounded-xl shadow-sm p-4">
+              <div class="flex items-center justify-between mb-4">
+                <div>
+                  <h3 class="text-sm font-semibold flex items-center gap-2">
+                    <span x-text="c.title"></span>
+                    <span x-show="c._unfiltered" @mouseenter="showTip($event, 'Time charts show about one granularity level of context around the selected range — a day breakdown spans the month, a week breakdown ~3 months, a month breakdown the full year — so the trend is never just a point or two. Every other filter still applies.')" @mousemove="moveTip($event)" @mouseleave="hideTip()"
+                      class="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-[var(--primary-light)] text-[var(--primary)] cursor-help whitespace-nowrap">+ context</span>
+                    <template x-for="f in (c._skippedFilters||[])" :key="f">
+                      <span @mouseenter="showTip($event, 'The '+f+' filter selects a single '+f+' — applying it here would collapse this breakdown to one bar. Showing all '+f+' values instead; the time filter and every other filter still apply.')" @mousemove="moveTip($event)" @mouseleave="hideTip()"
+                        class="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-[var(--primary-light)] text-[var(--primary)] cursor-help whitespace-nowrap" x-text="'all '+pfLabel(f).toLowerCase().replace(/s?$/,'s')"></span>
+                    </template>
+                  </h3>
+                  <p class="text-xs text-[var(--muted-foreground)]" x-text="chartSubtitle(c)"></p>
+                </div>
+                <button class="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--muted-foreground)] hover:bg-[var(--surface)] hover:text-[var(--primary)]" @mouseenter="showTip($event, metricTipHtml(c.title, chartTip(c), c.source))" @mousemove="moveTip($event)" @mouseleave="hideTip()" x-html="icon('info')"></button>
+              </div>
+              <div :id="`chart-${sec.id}-${ci}`" :style="`height:${ci===0 && sec.layout!=='breakdown-grid' ? 340 : 260}px`"></div>
+              <!-- empty state -->
+              <div x-show="(c._data||[]).length===0 && !loading" class="text-center py-8 text-sm text-[var(--muted-foreground)]">No results match the selected filters.</div>
+            </section>
+          </template>
+        </div>
+      </template>
+
+      <!-- data-table layout: rich typed table + section-scoped select filters -->
+      <template x-if="sec.table">
+        <section class="bg-[var(--surface-elevated)] border border-[var(--border)] rounded-xl shadow-sm p-4">
+          <div class="flex flex-wrap items-center gap-2 mb-4">
+            <h3 class="text-sm font-semibold mr-2" x-text="sec.tableTitle || 'Rows'"></h3>
+            <!-- Per-column sort + filter live in each column header (below). A "Clear filters" chip shows
+                 here when any column filter is active. -->
+            <button x-show="tableFilterCount(sec)>0" @click="clearAllColFilters(sec)"
+              class="px-2.5 py-1.5 rounded-lg text-xs font-medium text-[var(--negative)] hover:bg-[var(--negative-light)]"
+              x-text="`Clear filters (${tableFilterCount(sec)})`"></button>
+            <div class="flex-1"></div>
+            <!-- Generic "Copy" menu — every table that is NOT a performance table (no copySummary) gets it.
+                 "Copy as table" → a real table on the clipboard (rich HTML for Docs/Slack/email + TSV for
+                 Sheets/Excel). "Copy as image" → a PNG of the table (canvas-drawn, no external libs).
+                 Performance tables instead get the richer "Copy Performance Summary" (marker below). -->
+            <template x-if="sec.table && !sec.table.copySummary">
+              <div class="relative" x-data="{copyOpen:false}" @click.outside="copyOpen=false">
+                <button @click="copyOpen=!copyOpen"
+                  title="Copy this table — as a real table (Docs/Slack/Sheets) or as an image"
+                  class="px-3 py-1.5 rounded-lg border border-[var(--border)] text-xs font-medium flex items-center gap-1.5 hover:border-[var(--primary)] hover:text-[var(--primary)]">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+                  <span>Copy</span>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 9l6 6 6-6"/></svg>
+                </button>
+                <div x-show="copyOpen" x-transition @click="copyOpen=false" class="absolute right-0 mt-1 z-30 w-44 rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] shadow-md p-1">
+                  <button @click="copyTableView(sec)" class="w-full text-left px-2.5 py-1.5 rounded text-xs hover:bg-[var(--surface)] flex items-center gap-2">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M9 4v16"/></svg>
+                    <span>Copy as table</span>
+                  </button>
+                  <button @click="copyTableImage(sec)" class="w-full text-left px-2.5 py-1.5 rounded text-xs hover:bg-[var(--surface)] flex items-center gap-2">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.6"/><path d="M21 15l-5-5L5 21"/></svg>
+                    <span>Copy as image</span>
+                  </button>
+                </div>
+              </div>
+            </template>
+
+            <span class="text-xs text-[var(--muted-foreground)] tabular-nums" x-text="tableRowCount(sec)+' rows'"></span>
+          </div>
+          <!-- All rows are rendered; this box scrolls vertically (and horizontally) with a sticky header. -->
+          <div class="overflow-auto max-h-[65vh]">
+            <table class="w-full text-sm">
+              <thead class="sticky top-0 z-10 bg-[var(--surface-elevated)]">
+                <tr class="border-b border-[var(--border)]">
+                  <!-- leading expander column, only when this table opts into per-row detail -->
+                  <template x-if="sec.table.rowDetail"><th class="w-8 py-2.5 px-2"></th></template>
+                  <template x-for="col in sec.table.columns" :key="col.key">
+                    <th class="relative text-left py-2.5 px-3 text-[10px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)] select-none">
+                      <span class="inline-flex items-center gap-1">
+                        <!-- label doubles as the sort toggle -->
+                        <span @click="col.sortable!==false && sortBy(sec.id,col.key)" :class="col.sortable!==false ? 'cursor-pointer hover:text-[var(--foreground)]' : ''" x-text="col.label"></span>
+                        <!-- SORT control on every sortable column (always visible so it's clearly clickable) -->
+                        <button x-show="col.sortable!==false && col.label" @click="sortBy(sec.id,col.key)" title="Sort by this column"
+                          class="w-4 h-4 flex items-center justify-center leading-none">
+                          <span x-show="!(sortState[sec.id] && sortState[sec.id].key===col.key)" class="opacity-30 hover:opacity-70 text-[11px]">⇅</span>
+                          <span x-show="sortState[sec.id] && sortState[sec.id].key===col.key" class="text-[var(--primary)] text-[10px]" x-text="(sortState[sec.id] && sortState[sec.id].dir==='asc')?'▲':'▼'"></span>
+                        </button>
+                        <!-- FILTER control on every filterable column -->
+                        <button x-show="colFilterable(col)" @click.stop="colFilterOpen = (colFilterOpen===sec.id+'::'+col.key ? null : sec.id+'::'+col.key)" title="Filter this column"
+                          class="w-4 h-4 flex items-center justify-center" :class="colFilterActive(sec,col) ? 'text-[var(--primary)]' : 'opacity-30 hover:opacity-70'">
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 5h18l-7 8v6l-4-2v-4z"/></svg>
+                        </button>
+                        <button x-show="col.label" class="opacity-40 hover:opacity-100 hover:text-[var(--primary)]" @mouseenter="showTip($event, metricTipHtml(col.label, columnTip(col), col.source))" @mousemove="moveTip($event)" @mouseleave="hideTip()" x-html="icon('info')"></button>
+                      </span>
+                      <!-- per-column filter popover: value checklist (categorical) or min/max (numeric) -->
+                      <template x-if="colFilterable(col)">
+                        <div x-show="colFilterOpen===sec.id+'::'+col.key" x-cloak @click.outside="colFilterOpen===sec.id+'::'+col.key && (colFilterOpen=null)" x-transition
+                          class="absolute left-0 top-full mt-1 z-40 w-56 rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] shadow-md p-2 normal-case tracking-normal font-normal text-xs text-[var(--foreground)]" x-data="{cq:''}">
+                          <!-- categorical: pick one or more values -->
+                          <template x-if="colFilterKind(col)==='values'">
+                            <div>
+                              <input x-show="colValues(sec,col).length>10" x-model="cq" type="search" placeholder="Search values…" class="w-full mb-1.5 px-2 py-1 rounded border border-[var(--border)] outline-none focus:border-[var(--primary)]">
+                              <!-- Select all / Clear all -->
+                              <button @click="toggleColAll(sec,col)" class="w-full flex items-center gap-2 px-1.5 py-1 mb-1 pb-1.5 rounded text-left font-medium hover:bg-[var(--surface)] border-b border-[var(--border-subtle)]">
+                                <span class="w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0" :class="colAllSelected(sec,col) ? 'bg-[var(--primary)] border-[var(--primary)] text-white' : 'border-[var(--border)]'"><span x-show="colAllSelected(sec,col)" class="text-[9px]">✓</span></span>
+                                <span x-text="colAllSelected(sec,col) ? 'Clear all' : 'Select all'"></span>
+                              </button>
+                              <div class="flex flex-col gap-0.5 max-h-52 overflow-auto">
+                                <template x-for="v in colValues(sec,col).filter(x=>!cq||(''+x).toLowerCase().includes(cq.toLowerCase()))" :key="v">
+                                  <button @click="toggleColValue(sec,col,v)" class="flex items-center gap-2 px-1.5 py-1 rounded text-left hover:bg-[var(--surface)]">
+                                    <span class="w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0" :class="colValueSelected(sec,col,v) ? 'bg-[var(--primary)] border-[var(--primary)] text-white' : 'border-[var(--border)]'"><span x-show="colValueSelected(sec,col,v)" class="text-[9px]">✓</span></span>
+                                    <span class="truncate" x-text="v"></span>
+                                  </button>
+                                </template>
+                              </div>
+                            </div>
+                          </template>
+                          <!-- numeric: min / max range -->
+                          <template x-if="colFilterKind(col)==='range'">
+                            <div class="flex items-center gap-1.5">
+                              <input type="number" placeholder="Min" :value="colRange(sec,col).min" @input="setColRange(sec,col,'min',$event.target.value)" class="w-full px-2 py-1 rounded border border-[var(--border)] outline-none focus:border-[var(--primary)] tabular-nums">
+                              <span class="text-[var(--muted-foreground)]">–</span>
+                              <input type="number" placeholder="Max" :value="colRange(sec,col).max" @input="setColRange(sec,col,'max',$event.target.value)" class="w-full px-2 py-1 rounded border border-[var(--border)] outline-none focus:border-[var(--primary)] tabular-nums">
+                            </div>
+                          </template>
+                          <div class="flex items-center justify-between mt-2 pt-1.5 border-t border-[var(--border-subtle)]">
+                            <button @click="clearColFilter(sec,col)" class="text-[var(--muted-foreground)] hover:text-[var(--negative)]">Clear</button>
+                            <button @click="colFilterOpen=null" class="text-[var(--primary)] font-medium">Done</button>
+                          </div>
+                        </div>
+                      </template>
+                    </th>
+                  </template>
+                </tr>
+              </thead>
+              <!-- One x-for over a flat display model (tableDisplay): group-header rows, data rows, and
+                   expanded per-row detail rows are all emitted as <tr> items so a single template can
+                   render them. Grouping (sec.table.sectionGroupBy) and detail (sec.table.rowDetail) are
+                   both opt-in per section; with neither set this renders exactly as before. -->
+              <tbody>
+                <template x-for="item in tableDisplay(sec)" :key="item.key">
+                  <tr :class="item.type==='group' ? 'bg-[var(--surface)] border-y border-[var(--border)]' : item.type==='totals' ? 'bg-[var(--surface)] border-y-2 border-[var(--border)] font-semibold' : (item.type==='detail' ? '' : 'border-b border-[var(--border-subtle)] hover:bg-[var(--sidebar-item-hover)]')">
+                    <!-- platform section header -->
+                    <template x-if="item.type==='group'">
+                      <td :colspan="colCount(sec)" class="py-2 px-3">
+                        <div class="flex items-center gap-2">
+                          <span class="text-[11px] font-semibold uppercase tracking-wider text-[var(--foreground)]" x-text="item.label"></span>
+                          <span class="text-[10px] text-[var(--muted-foreground)] tabular-nums" x-text="item.count+(item.count===1?' campaign':' campaigns')"></span>
+                          <span class="flex-1"></span>
+                          <span class="text-[11px] text-[var(--muted-foreground)] tabular-nums" x-text="'Spend '+item.spendLabel"></span>
+                        </div>
+                      </td>
+                    </template>
+                    <!-- expander chevron (only on detail-enabled tables) -->
+                    <template x-if="item.type==='row' && sec.table.rowDetail">
+                      <td class="w-8 py-2.5 px-2 align-middle cursor-pointer text-[var(--muted-foreground)] hover:text-[var(--foreground)]" @click="toggleRow(sec,item.row)">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="transition-transform duration-150" :class="isRowExpanded(sec,item.row)?'rotate-90':''"><polyline points="9 6 15 12 9 18"/></svg>
+                      </td>
+                    </template>
+                    <!-- data cells -->
+                    <template x-if="item.type==='row'">
+                      <template x-for="col in sec.table.columns" :key="col.key">
+                        <td class="py-2.5 px-3" :class="sec.table.rowDetail?'cursor-pointer':''" @click="sec.table.rowDetail && col.type!=='image' && toggleRow(sec,item.row)" x-html="renderCell(col,item.row)"></td>
+                      </template>
+                    </template>
+                    <!-- totals row: leading empty cell (detail tables) + one cell per column -->
+                    <template x-if="item.type==='totals' && sec.table.rowDetail"><td class="py-2.5 px-2"></td></template>
+                    <template x-if="item.type==='totals'">
+                      <template x-for="col in sec.table.columns" :key="col.key">
+                        <td class="py-2.5 px-3 tabular-nums" x-text="item.cells[col.key]"></td>
+                      </template>
+                    </template>
+                    <!-- expanded per-day breakdown -->
+                    <template x-if="item.type==='detail'">
+                      <td :colspan="colCount(sec)" class="p-0 bg-[var(--surface)]">
+                        <div class="px-3 pb-3 pt-1" x-transition.opacity>
+                          <div class="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)] mb-1.5 mt-1" x-text="'Daily breakdown · '+rangeLabel()"></div>
+                          <table class="w-full text-xs border border-[var(--border-subtle)] rounded-lg overflow-hidden">
+                            <thead><tr class="bg-[var(--surface-elevated)] border-b border-[var(--border-subtle)]">
+                              <template x-for="h in dailyColumns()" :key="h.key">
+                                <th class="py-1.5 px-2.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)]" :class="h.type==='date'?'text-left':'text-right'" x-text="h.label"></th>
+                              </template>
+                            </tr></thead>
+                            <tbody>
+                              <template x-for="(d,di) in dailyRows(sec,item.row)" :key="di">
+                                <tr class="border-b border-[var(--border-subtle)] last:border-0">
+                                  <template x-for="h in dailyColumns()" :key="h.key">
+                                    <td class="py-1.5 px-2.5 tabular-nums" :class="h.type==='date'?'text-left text-[var(--muted-foreground)]':'text-right'" x-html="renderCell(h,d)"></td>
+                                  </template>
+                                </tr>
+                              </template>
+                            </tbody>
+                          </table>
+                        </div>
+                      </td>
+                    </template>
+                  </tr>
+                </template>
+                <tr x-show="tableRowCount(sec)===0">
+                  <td :colspan="colCount(sec)" class="text-center py-8 text-[var(--muted-foreground)]">No results match the selected filters.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <!-- footer — all rows are shown above (scroll the box); this just states the count -->
+          <div x-show="tableRowCount(sec)>0" class="flex items-center gap-2 mt-3 pt-3 border-t border-[var(--border-subtle)]">
+            <span class="text-xs text-[var(--muted-foreground)] tabular-nums" x-text="'Showing '+tableShownLabel(sec)"></span>
+          </div>
+        </section>
+      </template>
+
+      <!-- user widgets + New widget (every section) -->
+      <div x-show="widgets.length" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <template x-for="w in widgets" :key="w.id">
+          <section class="bg-[var(--surface-elevated)] border border-[var(--border)] rounded-xl shadow-sm p-4" :class="w.widgetFilters && w.widgetFilters.length ? 'widget-local-stripe':''">
+            <div class="flex items-center justify-between mb-2">
+              <h3 class="text-sm font-semibold" x-text="w.title || w.label"></h3>
+              <button @click="removeWidget(w.id)" class="w-6 h-6 rounded flex items-center justify-center text-[var(--muted-foreground)] hover:bg-[var(--surface)]" x-html="icon('x')"></button>
+            </div>
+            <div x-html="renderWidgetBody(w)"></div>
+          </section>
+        </template>
+      </div>
+      <button @click="openWidgetBuilder()" class="text-xs px-3 py-2 rounded-lg border border-dashed border-[var(--border)] text-[var(--muted-foreground)] hover:border-[var(--primary)] hover:text-[var(--primary)]">+ New widget</button>
+    </div>
+  </template>
+</main>
+
+<!-- ══ SLICER PANEL (right) ══ -->
+<div x-show="openSlicers.length" x-cloak class="fixed right-0 top-[56px] bottom-0 w-[320px] z-30 bg-[var(--surface-elevated)] border-l border-[var(--border)] flex flex-col">
+  <div class="h-11 px-4 flex items-center justify-between border-b border-[var(--border)] text-xs font-semibold">
+    <span x-text="`Filters · ${openSlicers.length}`"></span>
+    <button @click="openSlicers=[]" class="text-[var(--muted-foreground)] hover:text-[var(--foreground)]">Close all</button>
+  </div>
+  <div class="flex-1 overflow-y-auto">
+    <template x-for="os in openSlicers" :key="os.id">
+      <div class="border-b border-[var(--border-subtle)]" x-data="{q:''}">
+        <div class="px-4 py-2.5 flex items-center gap-2">
+          <span class="text-xs font-semibold flex-1 truncate" x-text="slicerById(os.id).label"></span>
+          <!-- include/exclude: a small toggle next to the name (chip slicers only); values below are the filter -->
+          <button x-show="os.id!=='date_range'" @click="setSlicerMode(os.id, slicerMode(os.id)==='not_in'?'in':'not_in')"
+            :title="slicerMode(os.id)==='not_in' ? 'Excluding the selected values — click to include instead' : 'Including the selected values — click to exclude instead'"
+            class="text-[10px] font-semibold px-1.5 py-0.5 rounded border shrink-0"
+            :class="slicerMode(os.id)==='not_in' ? 'border-[var(--negative)] text-[var(--negative)] bg-[var(--negative-light)]' : 'border-[var(--border)] text-[var(--muted-foreground)] hover:border-[var(--primary)]'"
+            x-text="slicerMode(os.id)==='not_in' ? 'Exclude' : 'Include'"></button>
+          <button @click="closeSlicer(os.id)" x-html="icon('x')" class="text-[var(--muted-foreground)] hover:text-[var(--foreground)] shrink-0"></button>
+        </div>
+        <!-- date slicer -->
+        <div x-show="os.id==='date_range'" class="px-4 pb-3 grid grid-cols-2 gap-1.5">
+          <template x-for="p in ['all_time','last_7d','last_30d','ytd']" :key="p">
+            <button @click="setPreset(p)" class="px-2 py-1.5 rounded text-[11px] border"
+              :class="range.preset===p ? 'border-[var(--primary)] text-[var(--primary)] bg-[var(--primary-light)]' : 'border-[var(--border)] hover:border-[var(--primary)]'" x-text="presetLabel(p)"></button>
+          </template>
+        </div>
+        <!-- chip slicer -->
+        <div x-show="os.id!=='date_range'" class="px-4 pb-3">
+          <!-- pick the values to filter by; the Include/Exclude toggle next to the name decides keep-vs-drop -->
+          <input x-show="(slicerValues[os.id]||[]).length>12" x-model="q" type="search" placeholder="Filter values…" class="w-full mb-2 px-2 py-1.5 text-xs rounded border border-[var(--border)] outline-none focus:border-[var(--primary)]">
+          <div class="flex flex-col gap-1 max-h-52 overflow-auto">
+            <template x-for="v in (slicerValues[os.id]||[]).filter(x=>!q||(''+x).toLowerCase().includes(q.toLowerCase()))" :key="v">
+              <button @click="toggleSlicerValue(os.id,v)" class="flex items-center gap-2 px-2 py-1.5 rounded text-xs text-left hover:bg-[var(--surface)]">
+                <span class="w-3.5 h-3.5 rounded border flex items-center justify-center"
+                      :class="isValueSelected(os.id,v) ? 'bg-[var(--primary)] border-[var(--primary)] text-white' : 'border-[var(--border)]'">
+                  <span x-show="isValueSelected(os.id,v)" class="text-[9px]">✓</span></span>
+                <span x-text="v"></span>
+              </button>
+            </template>
+          </div>
+        </div>
+      </div>
+    </template>
+  </div>
+</div>
+
+<!-- ══ COMMAND PALETTE ══ -->
+<div x-show="commandPaletteOpen" x-cloak @keydown.escape.window="commandPaletteOpen=false" class="fixed inset-0 z-50 flex items-start justify-center pt-32 bg-black/30" :style="{ paddingRight: (chatOpen?440:0)+'px' }" @click.self="commandPaletteOpen=false">
+  <div class="w-[480px] rounded-xl bg-[var(--surface-elevated)] border border-[var(--border)] shadow-md overflow-hidden" x-data="{q:''}">
+    <div class="flex items-center gap-2 border-b border-[var(--border)] px-3">
+      <span x-html="icon('search')" class="text-[var(--muted-foreground)]"></span>
+      <input x-model="q" x-ref="pal" type="text" :placeholder="paletteMode==='filter' ? 'Add a filter…' : 'Search all tabs…'" class="flex-1 py-3 text-sm outline-none bg-transparent" x-init="$nextTick(()=>$refs.pal.focus())">
+      <button @click="commandPaletteOpen=false" title="Close" class="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--muted-foreground)] hover:bg-[var(--surface)]" x-html="icon('x')"></button>
+    </div>
+    <div class="max-h-80 overflow-auto p-1">
+      <!-- FILTER MODE — opened from "+ Add filter": only lets you add a filter -->
+      <template x-if="paletteMode==='filter'">
+        <div>
+          <template x-if="paletteSlicers(q).length">
+            <div>
+              <div class="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">Add a filter</div>
+              <template x-for="s in paletteSlicers(q)" :key="'fil-'+s.id">
+                <button @click="toggleSlicer(s.id,'global'); commandPaletteOpen=false" class="w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-[var(--surface)] flex items-center gap-2">
+                  <span x-html="icon('filter')" class="text-[var(--muted-foreground)]"></span><span x-text="'Filter by '+s.label"></span>
+                </button>
+              </template>
+            </div>
+          </template>
+          <div x-show="q && !paletteSlicers(q).length" class="px-3 py-6 text-center text-sm text-[var(--muted-foreground)]">No filter matches “<span x-text="q"></span>”.</div>
+        </div>
+      </template>
+      <!-- SEARCH MODE — opened from the top-right Search: full-text search across every tab -->
+      <template x-if="paletteMode==='search'">
+        <div>
+          <template x-if="q && searchApp(q).length">
+            <div>
+              <div class="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">Results — click to jump to it</div>
+              <template x-for="m in searchApp(q)" :key="m.key">
+                <button @click="goToHit(m,q)" class="w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-[var(--surface)] flex items-start gap-2">
+                  <span x-html="icon(m.icon)" class="text-[var(--muted-foreground)] mt-0.5 shrink-0"></span>
+                  <span class="min-w-0"><span class="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)]" x-text="m.label"></span><span class="block text-xs text-[var(--foreground)] truncate" x-text="m.snippet"></span></span>
+                </button>
+              </template>
+            </div>
+          </template>
+          <div x-show="!q" class="px-3 py-6 text-center text-sm text-[var(--muted-foreground)]">Type any text to search across the whole app…</div>
+          <div x-show="q && !searchApp(q).length" class="px-3 py-6 text-center text-sm text-[var(--muted-foreground)]">Nothing in the app matches “<span x-text="q"></span>”.</div>
+        </div>
+      </template>
+    </div>
+  </div>
+</div>
+
+<!-- ══ WIDGET BUILDER — Title · Metric · Breakdown · Chart type · live Preview ══ -->
+<div x-show="widgetBuilderOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" @click.self="widgetBuilderOpen=false">
+  <div class="w-full max-w-3xl rounded-xl bg-[var(--surface-elevated)] border border-[var(--border)] shadow-md overflow-hidden">
+    <div class="flex items-center justify-between border-b border-[var(--border)] px-5 py-3">
+      <h3 class="text-sm font-semibold">Add widget</h3>
+      <button @click="widgetBuilderOpen=false" title="Close" class="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--muted-foreground)] hover:bg-[var(--surface)]" x-html="icon('x')"></button>
+    </div>
+    <div class="grid gap-5 p-5 md:grid-cols-2">
+      <!-- form -->
+      <div class="space-y-4">
+        <div>
+          <label class="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">Title</label>
+          <input x-model="wTitle" :placeholder="widgetAutoTitle()" class="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-[var(--border)] outline-none focus:border-[var(--primary)]">
+        </div>
+        <div>
+          <label class="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">Metric</label>
+          <select x-model="wMetricKey" class="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-[var(--border)] outline-none focus:border-[var(--primary)] bg-[var(--surface-elevated)]">
+            <template x-for="m in widgetMetrics()" :key="m.key"><option :value="m.key" x-text="m.label"></option></template>
+          </select>
+        </div>
+        <div x-show="wType==='bar' || wType==='donut'">
+          <label class="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">Break down by</label>
+          <select x-model="wBreakdown" class="w-full mt-1 px-3 py-2 text-sm rounded-lg border border-[var(--border)] outline-none focus:border-[var(--primary)] bg-[var(--surface-elevated)]">
+            <template x-for="d in widgetDims()" :key="d.key"><option :value="d.key" x-text="d.label"></option></template>
+          </select>
+        </div>
+        <div>
+          <label class="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">Chart type</label>
+          <div class="mt-1 flex flex-wrap gap-1.5">
+            <template x-for="t in [{k:'bar',l:'Bar'},{k:'donut',l:'Donut'},{k:'line',l:'Line (over time)'},{k:'single',l:'Single number'}]" :key="t.k">
+              <button @click="wType=t.k" class="px-3 py-1.5 rounded-lg text-xs border" :class="wType===t.k ? 'border-[var(--primary)] text-white bg-[var(--primary)]' : 'border-[var(--border)] hover:border-[var(--primary)]'" x-text="t.l"></button>
+            </template>
+          </div>
+        </div>
+      </div>
+      <!-- preview -->
+      <div>
+        <label class="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">Preview</label>
+        <div class="mt-1 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 min-h-[260px]">
+          <div class="text-sm font-semibold mb-3" x-text="wTitle||widgetAutoTitle()"></div>
+          <div x-html="renderWidgetBody(previewCfg())"></div>
+        </div>
+      </div>
+    </div>
+    <div class="flex justify-end gap-2 border-t border-[var(--border)] px-5 py-3">
+      <button @click="widgetBuilderOpen=false" class="text-sm px-3 py-2 rounded-lg text-[var(--muted-foreground)] hover:bg-[var(--surface)]">Cancel</button>
+      <button @click="addWidget()" class="text-sm px-4 py-2 rounded-lg bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white font-medium">Add widget</button>
+    </div>
+  </div>
+</div>
+
+
+
+<!-- ══ PEEK POPOVER (single-click drill) ══ -->
+<div x-show="peek" x-cloak class="fixed z-50" :style="{ left: (peek?peek.x:0)+'px', top: (peek?peek.y:0)+'px' }" @click.outside="peek=null">
+  <div class="rounded-xl bg-[var(--surface-elevated)] border border-[var(--border)] shadow-md p-3 w-56">
+    <div class="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)]" x-text="peek&&peek.field"></div>
+    <div class="text-sm font-semibold mb-1" x-text="peek&&peek.value"></div>
+    <div class="text-xs text-[var(--muted-foreground)] mb-2 tabular-nums" x-text="peek&&peek.metric"></div>
+    <div class="flex gap-1.5">
+      <button @click="digIn()" class="flex-1 text-xs px-2 py-1.5 rounded-lg bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white font-medium">Dig in ↘</button>
+      <button @click="peekExclude()" class="text-xs px-2 py-1.5 rounded-lg border border-[var(--border)] hover:border-[var(--primary)]">Exclude</button>
+      <button @click="peekToChat()" class="text-xs px-2 py-1.5 rounded-lg border border-[var(--border)] hover:border-[var(--primary)]" x-html="icon('chat')"></button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ CHAT (collapsible drawer — closed by default, opened via the launcher button) ══ -->
+<div x-show="chatOpen" x-cloak
+     x-transition:enter="transition ease-out duration-200" x-transition:enter-start="translate-x-full" x-transition:enter-end="translate-x-0"
+     x-transition:leave="transition ease-in duration-150" x-transition:leave-start="translate-x-0" x-transition:leave-end="translate-x-full"
+     class="fixed right-0 top-0 bottom-0 w-[440px] z-50 bg-[var(--surface-elevated)] border-l border-[var(--border)] flex flex-col shadow-md">
+  <div class="h-[56px] px-4 flex items-center gap-2 border-b border-[var(--border)]">
+    <span class="w-8 h-8 rounded-full bg-[var(--primary)] text-white flex items-center justify-center" x-html="icon('chat')"></span>
+    <div class="flex-1"><div class="text-sm font-semibold">Ask me anything!</div><div class="text-[11px] text-[var(--muted-foreground)]">Grounded in this project's data</div></div>
+    <button @click="chatNewSession()" title="New chat — start a fresh session" class="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--muted-foreground)] hover:bg-[var(--surface)] hover:text-[var(--foreground)]">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+    </button>
+    <button @click="chatOpen=false" title="Close chat" class="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--muted-foreground)] hover:bg-[var(--surface)] hover:text-[var(--foreground)]" x-html="icon('x')"></button>
+  </div>
+  <div class="flex-1 overflow-y-auto p-4 space-y-3">
+    <template x-if="chatMessages.length===0">
+      <div class="text-center pt-10">
+        <div class="text-2xl mb-2">👋</div>
+        <p class="text-sm text-[var(--muted-foreground)] mb-4">Ask about your dashboard — KPI shifts, segment differences, anomalies.</p>
+        <div class="flex flex-col gap-1.5">
+          <template x-for="sp in chatStarters" :key="sp">
+            <button @click="chatSend(sp)" class="text-xs text-left px-3 py-2 rounded-lg border border-[var(--border)] hover:border-[var(--primary)] hover:text-[var(--primary)]" x-text="sp"></button>
+          </template>
+        </div>
+      </div>
+    </template>
+    <template x-for="(m,mi) in chatMessages" :key="mi">
+      <div x-show="m.kind!=='processing_message'" :class="m.role==='user' ? 'flex justify-end' : 'flex justify-start'">
+        <!-- user: plain text (escaped). assistant: the agent's HTML answer, sanitized + rendered. -->
+        <div x-show="m.role==='user'" class="max-w-[80%] px-3 py-2 rounded-xl text-sm whitespace-pre-wrap bg-[var(--primary)] text-white" x-text="m.text"></div>
+        <div x-show="m.role!=='user'" class="max-w-[88%] px-3 py-2 rounded-xl text-sm overflow-x-auto bg-[var(--surface)] text-[var(--foreground)] chat-rich" x-html="renderChatHtml(m.text)"></div>
+      </div>
+    </template>
+    <!-- single live progress line: the LATEST status only, with the loading icon, shown only while the
+         current question is being answered (past progress already happened, so it isn't kept around) -->
+    <div x-show="chatProcessing" class="flex items-center gap-2 px-2 text-[11px] text-[var(--muted-foreground)]">
+      <span class="spin w-3 h-3"></span><span x-text="chatStatus||'Thinking…'"></span>
+    </div>
+  </div>
+  <div class="p-3 border-t border-[var(--border)] flex gap-2">
+    <textarea x-model="chatInput" @keydown.enter.prevent="chatSend(chatInput)" rows="1" placeholder="Ask me anything…" class="flex-1 px-3 py-2 text-sm rounded-lg border border-[var(--border)] outline-none focus:border-[var(--primary)] resize-none"></textarea>
+    <button @click="chatSend(chatInput)" class="px-3 rounded-lg bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white" x-html="icon('send')"></button>
+  </div>
+</div>
+
+<!-- ══ CHAT LAUNCHER (always present; opens the chat drawer) ══ -->
+<button x-show="!chatOpen" x-cloak @click="chatOpen=true" title="Ask me anything"
+        class="fixed bottom-5 right-5 z-50 h-12 w-12 rounded-full bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white shadow-md flex items-center justify-center transition-transform hover:scale-105">
+  <span x-html="icon('chat')"></span>
+</button>
+
+<!-- ══ TOASTS ══ -->
+<div class="fixed top-4 left-1/2 -translate-x-1/2 z-[60] flex flex-col gap-2 items-center">
+  <template x-for="t in toasts" :key="t.id">
+    <div class="px-4 py-2 rounded-lg shadow-md text-sm border" :class="t.kind==='error' ? 'bg-[var(--negative-light)] border-[var(--negative)] text-[var(--negative)]' : 'bg-[var(--surface-elevated)] border-[var(--border)]'" x-text="t.text"></div>
+  </template>
+</div>
+
+<script>
+/* ══════════════════════════ HELPERS ══════════════════════════ */
+/* ── connection layer (see connections/CONNECTIONS.md) — slug-prefixed base, cookie auth (Mode 2) ── */
+function apiBase(){ return '/' + (APP_CONFIG.appSlug || '') + '/api'; }   // NOT bare /api — that drops the session cookie
+function wsId(){ return APP_CONFIG.workspaceId; }
+function projId(){ return APP_CONFIG.projectId; }
+function apiHeaders(extra){ return Object.assign({ 'Accept':'application/json', 'Content-Type':'application/json', 'X-Workspace-Id':wsId() }, extra||{}); }
+function safeGet(k,f){ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):f; }catch(e){ return f; } }
+function safeSet(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} }
+// ── chat answer rendering ── the Asky agent returns HTML; render a SANITIZED subset so it shows as a
+// real heading/table/list/bold instead of raw tags. Plain-text answers get newline→<br>. XSS-safe:
+// DOMParser doesn't execute scripts, and we whitelist tags + drop all attributes (except safe <a href>).
+const _CHAT_TAGS=new Set(['H1','H2','H3','H4','H5','H6','P','BR','HR','STRONG','B','EM','I','U','S','UL','OL','LI','TABLE','THEAD','TBODY','TFOOT','TR','TH','TD','CODE','PRE','BLOCKQUOTE','SPAN','DIV','A']);
+function sanitizeChatHtml(html){
+  const doc=new DOMParser().parseFromString(String(html),'text/html');
+  (function walk(node){
+    for(const n of [...node.childNodes]){
+      if(n.nodeType===1){
+        if(/^(SCRIPT|STYLE|NOSCRIPT|IFRAME|OBJECT|EMBED|TEMPLATE|LINK|META)$/.test(n.tagName)){ n.remove(); continue; }  // drop entirely (incl. text)
+        if(!_CHAT_TAGS.has(n.tagName)){ n.replaceWith(document.createTextNode(n.textContent||'')); continue; }
+        for(const a of [...n.attributes]){
+          const nm=a.name.toLowerCase();
+          if(n.tagName==='A' && nm==='href' && /^(https?:|mailto:|\/)/i.test(a.value)) continue;
+          n.removeAttribute(a.name);
+        }
+        if(n.tagName==='A'){ n.setAttribute('target','_blank'); n.setAttribute('rel','noopener noreferrer'); }
+        walk(n);
+      } else if(n.nodeType===8){ n.remove(); }   // strip comments
+    }
+  })(doc.body);
+  return doc.body.innerHTML;
+}
+function renderChatHtml(text){
+  text=(text==null?'':String(text));
+  if(/<[a-z][\s\S]*?>/i.test(text)) return sanitizeChatHtml(text);          // looks like HTML → sanitize + render
+  return text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');  // plain → escape + line breaks
+}
+function chartColor(n){ return cssVar('--chart-'+(((n-1)%6)+1)); }
+function cssVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+function escapeIdent(s){ return String(s).replace(/[^a-zA-Z0-9_]/g,''); }
+function escapeSqlLiteral(v){ return String(v).replace(/'/g,"''"); }
+
+/* ── Number & date formatting policy (decide once per metric, apply everywhere) ──
+   Decimal precision scales with the SHOWN mantissa (the leading number before any K/M/%/x):
+   a mantissa with >2 integer digits (≥100) shows 1 decimal; ≤2 digits (<100) shows 2 decimals.
+   So $6,352.89 → $6,352.9  ·  2.6K → 2.58K  ·  2.3% → 2.31%. Trailing zeros are trimmed. */
+function smartDecimals(mantissa){ return Math.abs(mantissa) >= 100 ? 1 : 2; }
+function trimZeros(s){ return s.indexOf('.')>=0 ? s.replace(/\.?0+$/,'') : s; }
+function smartFixed(mantissa){ return trimZeros(mantissa.toFixed(smartDecimals(mantissa))); }        // "2.58", "6352.9", "260"
+function smartMoney(n){ const d=smartDecimals(n); return trimZeros(new Intl.NumberFormat('en-US',{minimumFractionDigits:d,maximumFractionDigits:d}).format(n)); } // grouped + smart decimals
+function formatExact(n){ return new Intl.NumberFormat('en-US').format(Math.round(n)); }
+function formatAbbrev(n){ const a=Math.abs(n);
+  if(a>=1e9) return smartFixed(n/1e9)+'B';
+  if(a>=1e6) return smartFixed(n/1e6)+'M';
+  if(a>=1e3) return smartFixed(n/1e3)+'K';
+  return smartFixed(n); }
+function fmt(kind, n){ // returns {label (abbreviated), exact}
+  n=+n||0;
+  switch(kind){
+    case 'currency':  return { label:'$'+formatAbbrev(n), exact:'$'+smartMoney(n) };
+    case 'count':     return { label:formatAbbrev(n), exact:formatExact(n) };
+    case 'percent':   return { label:smartFixed(n*100)+'%', exact:smartFixed(n*100)+'%' };           // never abbreviated
+    case 'ratio':     return { label:smartFixed(n)+'x', exact:smartFixed(n)+'x' };                    // never abbreviated
+    case 'perunit':   return { label:'$'+smartFixed(n), exact:'$'+smartFixed(n) };                    // never abbreviated
+    case 'integer':   return { label:formatAbbrev(n), exact:formatExact(n) };
+    default:          return { label:formatAbbrev(n), exact:formatExact(n) };
+  }
+}
+function fmtCell(type,v){
+  if(v==null||v==='') return '—';
+  if(type==='currency')return fmt('currency',v).exact;   // tables show EXACT
+  if(type==='percent') return fmt('percent',v).label;
+  if(type==='ratio')   return fmt('ratio',v).label;
+  if(type==='perunit') return fmt('perunit',v).label;
+  if(type==='number')  return fmt('count',v).exact;
+  if(type==='date')    return formatDate(v);
+  return v;
+}
+function formatDate(v){ try{ const d=new Date(v); return d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }catch(e){ return v; } }
+
+/* ── Table connections: POST /<slug>/api/Data/getModelView (contract per connections/CONNECTIONS.md) ── */
+async function queryModel(modelId, sql, retries){
+  retries = retries==null?12:retries;
+  for(let attempt=0;;attempt++){
+    const r = await fetch(`${apiBase()}/Data/getModelView`, { method:'POST', credentials:'include', headers:apiHeaders(),
+      body:JSON.stringify({ workspaceId:wsId(), projectId:projId(), modelId, query:sql }) });
+    let j={}; try{ j=await r.json(); }catch(e){}
+    const code=j.errorCode||j.code;
+    if((code==='WAREHOUSE_COLD_START' || j.retryable) && attempt<retries){       // the one place that retries (cold start)
+      await new Promise(s=>setTimeout(s, Math.min(((j.retryAfterSeconds)||5)*1000, 10000))); continue;
+    }
+    if(!r.ok || j.error || j.Success===false) throw new Error(j.error || j.errorMessage || ('HTTP '+r.status));
+    const D=j.Data||j.data;                                                       // mixed-case defensively
+    if(D && D.colSchema){ const cols=D.colSchema.map(c=>c.name); return (D.data||[]).map(row=>Object.fromEntries(cols.map((c,i)=>[c,row[i]]))); }
+    return j.rows || D || [];
+  }
+}
+/* ── API gateway helpers: /<slug>/api/gw/... — writes encode params in the query string, no body ── */
+function gwBase(){ return apiBase()+'/gw'; }
+function providerError(j){ return (j && (j.error_user_msg||j.error_user_title||j.message||j.errorMessage||j.ErrorMessage||j.error)) || 'gateway error'; }
+async function gw(path, params){ const qs=new URLSearchParams(params||{}).toString();
+  const r=await fetch(`${gwBase()}${path}${qs?('?'+qs):''}`, { credentials:'include', headers:apiHeaders() });
+  const j=await r.json(); if(!r.ok||j.error) throw new Error(providerError(j)); return j; }
+async function gwWrite(path, params){ const qs=new URLSearchParams(params||{}).toString();
+  const r=await fetch(`${gwBase()}${path}?${qs}`, { method:'POST', credentials:'include', headers:apiHeaders() });   // params in query string, no body
+  const j=await r.json(); if(!r.ok||j.error) throw new Error(providerError(j)); return j; }
+const gwCreate = gwWrite;   // returns the created { id }
+/* ── queryAny: dispatch a section's data source to prism SQL or a REST gateway (point 10) ── */
+async function queryAny(ds, spec){
+  if(ds.kind==='prism') return queryModel(ds.prism, spec.sql);
+  if(ds.kind==='rest'){ const j = await gw((ds.base||'')+(spec.path||''), spec.params); return ds.map ? ds.map(j) : j; }
+  throw new Error('Unknown data source kind: '+ds.kind);
+}
+
+/* ── inline Phosphor-style icons ── */
+const ICONS = {
+  grid:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>',
+  chart:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 19V5"/><path d="M4 19h16"/><path d="M8 16l4-5 3 3 4-6"/></svg>',
+  table:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M9 4v16"/></svg>',
+  funnel:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 5h18l-7 8v6l-4-2v-4z"/></svg>',
+  search:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>',
+  calendar:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>',
+  filter:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 5h18l-7 8v6l-4-2v-4z"/></svg>',
+  info:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>',
+  x:'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+  caret:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 9l6 6 6-6"/></svg>',
+  arrowup:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 19V5M5 12l7-7 7 7"/></svg>',
+  arrowdown:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12l7 7 7-7"/></svg>',
+  warning:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l9 16H3z"/><path d="M12 10v4M12 17h.01"/></svg>',
+  chat:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 12a8 8 0 0 1-11.5 7.2L4 20l.8-5.5A8 8 0 1 1 21 12z"/></svg>',
+  send:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></svg>',
+  collapse:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M15 6l-6 6 6 6"/></svg>',
+  expand:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 6l6 6-6 6"/></svg>',
+  optimize:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3"/></svg>',
+  spark:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l2 5 5 2-5 2-2 5-2-5-5-2 5-2z"/></svg>',
+  cart:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2 3h2.2l2.3 12.4a1.5 1.5 0 0 0 1.5 1.2h8.6a1.5 1.5 0 0 0 1.5-1.2L21 7H5.5"/></svg>',
+};
+// "Powered by Ask-Y" mark — the isometric brand cube + wordmark, inline so it needs no external asset.
+const ASKY_CUBE = '<svg width="18" height="18" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0"><path d="M24 7 L39 15.5 L24 24 L9 15.5 Z" fill="#f6b21b"/><path d="M9 15.5 L24 24 L24 41 L9 32.5 Z" fill="#2d7ff9"/><path d="M39 15.5 L39 32.5 L24 41 L24 24 Z" fill="#f2683c"/><path d="M24 24 L31.5 19.75 L31.5 36.75 L24 41 Z" fill="#e5484d" opacity="0.72"/><path d="M16.5 19.75 L24 24 L24 41 L16.5 36.75 Z" fill="#7c3aed" opacity="0.42"/></svg>';
+const ASKY_WORDMARK = '<span style="font-weight:800;font-size:13px;letter-spacing:.4px;color:#26324d;line-height:1">ASK-Y</span>';
+const ASKY_LOGO = '<span style="display:inline-flex;align-items:center;gap:5px">'+ASKY_CUBE+ASKY_WORDMARK+'</span>';
+
+/* ══════════════════════════ SYNTHETIC DATA (demo mode) ══════════════════════════ */
+const PLATFORMS=['Search','Social','Video','Display'];   // generic channel demo values (no real product names)
+const DEVICES=['Mobile','Desktop','Tablet'];
+const STATUSES=['ACTIVE','PAUSED','ENDED'];
+const OBJECTIVES=['Conversions','Traffic','Awareness'];
+// Each synthetic campaign has a real FLIGHT — an active window [active_from, active_to] of
+// flight_days — plus a per-day baseline (_dSpend/_dImpr/…). The top-level spend/impressions/…
+// are the whole-flight totals (= baseline × flight_days). rowsForSection() filters a campaign in
+// only when its flight OVERLAPS the active date range and prorates its metrics to the in-range
+// days, so a campaign that wasn't running in the selected range never appears (and never gets a
+// fabricated day-by-day breakdown). Real mode mirrors this: the warehouse SUMs over WHERE date in
+// range, which is 0 rows for an inactive campaign.
+function synthRows(n){
+  // Anchor flights to TODAY so the demo always looks current — recent date presets (Last 7d/30d)
+  // show the campaigns that were running in that window instead of an empty table.
+  const rows=[]; const anchor=new Date(); const iso=d=>d.toISOString().slice(0,10);
+  for(let i=0;i<n;i++){
+    const plat=PLATFORMS[i%PLATFORMS.length], dev=DEVICES[i%DEVICES.length], obj=OBJECTIVES[i%3];
+    const dSpend = 40 + Math.abs(Math.sin(i*1.7))*1200;              // per-day baseline
+    const dClicks= dSpend*(0.4+Math.abs(Math.cos(i))*1.6);
+    const dImpr  = dClicks*(20+Math.abs(Math.sin(i*2.3))*60);
+    const dConv  = dClicks*(0.01+Math.abs(Math.sin(i*0.7))*0.06);
+    const dRev   = dConv*(30+Math.abs(Math.cos(i*1.1))*120);
+    const flightDays = 6 + (i*7)%34;                                 // 6..39 active days
+    const endOffset  = (i*13)%56;                                    // flight ended 0..55 days before anchor
+    const aTo=new Date(anchor); aTo.setDate(aTo.getDate()-endOffset);
+    const aFrom=new Date(aTo);  aFrom.setDate(aFrom.getDate()-(flightDays-1));
+    const spend=dSpend*flightDays, clicks=Math.round(dClicks*flightDays),
+          impr=Math.round(dImpr*flightDays), conv=Math.round(dConv*flightDays), rev=dRev*flightDays;
+    rows.push({
+      campaign_id:'c'+(1000+i), campaign_name:plat+' · '+obj+' '+(i+1),
+      platform:plat, device:dev, objective:obj,
+      status:STATUSES[i%6===0?2:(i%3===0?1:0)],
+      spend, impressions:impr, clicks, conversions:conv, revenue:rev,
+      ctr: clicks/Math.max(impr,1), roas: rev/Math.max(spend,1), cpa: conv?spend/conv:null,
+      active_from: iso(aFrom), active_to: iso(aTo), flight_days: flightDays,
+      _dSpend:dSpend, _dImpr:dImpr, _dClicks:dClicks, _dConv:dConv, _dRev:dRev,
+      event_date: iso(aTo),
+      creative:'https://picsum.photos/seed/'+i+'/64/40'
+    });
+  }
+  return rows;
+}
+
+/* ── config-aware synthetic data ── demo mode must never be all-zeros for ANY app. Each source gets rows
+   carrying exactly the fields ITS sections reference (KPI exprs, chart metric/dimension, table columns,
+   funnel steps, slicers). Campaign-like sources keep the rich flighted synthRows demo (proration + daily
+   breakdown); every other source gets generic non-zero rows whose value TYPE is inferred from the field
+   name (date / id / dimension / rate / metric). This is what makes every built app behave the same. */
+function synthDays(n){ const out=[], a=new Date(); for(let i=n-1;i>=0;i--){ const d=new Date(a); d.setDate(d.getDate()-i); out.push(d.toISOString().slice(0,10)); } return out; }
+function synthFieldsForSource(id){
+  const fields=new Set(), dims=new Set(); const dateField=(APP_CONFIG.dataSources[id]||{}).dateCol||'';
+  for(const sec of (APP_CONFIG.sections||[])){ if(((sec.source)||'primary')!==id) continue;
+    (sec.kpis||[]).forEach(k=>k.expr&&fields.add(k.expr));
+    (sec.charts||[]).forEach(c=>{ c.metric&&fields.add(c.metric); c.metricY&&fields.add(c.metricY); if(c.dimension){ fields.add(c.dimension); dims.add(c.dimension); } });
+    ((sec.table&&sec.table.columns)||[]).forEach(col=>col.key&&fields.add(col.key));
+    ((sec.funnel&&sec.funnel.steps)||[]).forEach(s=>{ s.metric&&fields.add(s.metric); s.web&&fields.add(s.web); });
+  }
+  (APP_CONFIG.slicers||[]).forEach(s=>{ if(s.field){ fields.add(s.field); dims.add(s.field); } });
+  return { fields:[...fields], dims, dateField };
+}
+const SYNTH_VOCAB={
+  channel:['Organic Search','Direct','Paid Social','Paid Search','Referral','Email','Display','Organic Social'],
+  platform:['Meta','Google','LinkedIn','TikTok','Microsoft'], device:['Mobile','Desktop','Tablet'],
+  objective:['Conversions','Traffic','Awareness'], status:['ACTIVE','PAUSED','ENDED'], country:['US','UK','DE','FR','IL','CA'],
+  _default:['Group A','Group B','Group C','Group D','Group E','Group F','Group G','Group H'] };
+function synthVocab(f){ const k=Object.keys(SYNTH_VOCAB).find(x=>x!=='_default'&&f.toLowerCase().includes(x)); return SYNTH_VOCAB[k]||SYNTH_VOCAB._default; }
+function synthValue(f,i,dims,dateField,days){
+  const lf=f.toLowerCase();
+  if(f===dateField || /(^|_)date$|event_date|session_date/.test(lf)) return days[i%days.length];
+  if(/(^|_)id$|^user$|^session/.test(lf)) return lf.includes('user') ? 'u'+(i%Math.max(8,Math.floor(days.length*2.4))) : f+'_'+i;
+  if(dims.has(f)){ const v=synthVocab(f); return v[i%v.length]; }
+  if(/page.?path|url|^path$/.test(lf)) return ['/','/pricing','/product','/blog','/docs','/about','/contact','/signup'][i%8];
+  if(/name$|title|campaign/.test(lf)) return synthVocab('platform')[i%5]+' · '+SYNTH_VOCAB.objective[i%3]+' '+(i+1);
+  if(/ctr|cvr|rate|roas|cpc|cpa|ratio|percent|pct/.test(lf)) return +(0.01+Math.abs(Math.sin(i*1.3+lf.length))*0.45).toFixed(4);
+  return Math.round(20+Math.abs(Math.sin(i*1.7+lf.length))*1500);   // generic positive metric
+}
+function synthForSource(id){
+  const {fields,dims,dateField}=synthFieldsForSource(id);
+  const ds=APP_CONFIG.dataSources[id]||{};
+  const campaignLike = ds.category==='ad' || fields.some(f=>/^(spend|impressions|clicks)$/i.test(f));
+  const days=synthDays(60);
+  const base = campaignLike ? synthRows(48) : Array.from({length:200},()=>({}));   // campaign keeps flights; others generic
+  return base.map((row,i)=>{
+    for(const f of fields){ if(!(f in row) || row[f]==null) row[f]=synthValue(f,i,dims,dateField,days); }
+    if(!('n' in row)) row.n=1;   // analytics charts often count rows via a metric named 'n'
+    if(dateField && dateField!=='_allTime' && !(dateField in row) && !('event_date' in row)) row[dateField]=days[i%days.length];
+    return row;
+  });
+}
+
+/* ══════════════════════════ TIME GRAIN (D/W/M/Q) ══════════════════════════ */
+// Each grain reshapes the date-range presets (grainPresets/resolveRange) AND re-buckets
+// time-series charts (dateBucketKey). W/M/Q default to the current period; D defaults to
+// Today but offers "Last 7d" as its first/obvious preset so it's never a one-dot chart.
+const GRAIN_PRESETS = {
+  D: ['last_7d','today','last_30d','last_90d'],
+  W: ['this_week','last_4w','last_8w','last_12w'],
+  M: ['this_month','last_3m','last_6m','last_12m'],
+  Q: ['this_quarter','last_4q','last_8q'],
+};
+const GRAIN_DEFAULT = { D:'today', W:'this_week', M:'this_month', Q:'this_quarter' };
+const isoOf = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+// Map a row's 'YYYY-MM-DD' date to its bucket key for the active grain. Keys are strings
+// that sort chronologically, so the existing Object.keys(...).sort() stays correct.
+function dateBucketKey(dateStr, g){
+  if(!dateStr) return dateStr;
+  const s=String(dateStr);
+  if(g==='M') return s.slice(0,7);                                                   // YYYY-MM
+  if(g==='Q'){ const [y,mm]=s.split('-'); return `${y}-Q${Math.floor((+mm-1)/3)+1}`; } // YYYY-Q#
+  if(g==='W'){ const d=new Date(s.slice(0,10)+'T00:00:00'); const dow=(d.getDay()+6)%7; d.setDate(d.getDate()-dow); return isoOf(d); } // Monday of that week
+  return s.slice(0,10);                                                              // D: YYYY-MM-DD
+}
+// A chart dimension that is a date/time field (event_date, session_date, date, month, …). Time
+// axes bucket by grain and are the only breakdowns the time-filter "one bucket → skip" rule touches.
+function isTimeField(d){ return /(^|_)(date|time|day|week|month|quarter|year|hour|minute)s?($|_)/i.test(String(d||'')); }
+
+/* ══════════════════════════ APP_CONFIG — fill this to build an app ══════════════════════════ */
+const APP_CONFIG = {
+  hideDate:true,
+  title:'__APP_NAME__', appInitial:'__APP_INITIAL__', appSlug:'__APP_SLUG__',
+  logo:'',   // optional: a logo image URL or data-URI; when set it replaces the initial badge in the sidebar (interview Stage 2)
+  workspaceId:'__WORKSPACE_ID__', projectId:'__PROJECT_ID__',
+  dataSources:{
+    // Declare EVERY connected source the app should use — both kinds below. The generic loader
+    // (loadData → loadSource) loads them all and rowsForSection() routes by a section's `source`.
+    //   kind:'prism' → a warehoused table, queried via getModelView.
+    //   kind:'rest'  → a LINKED API GATEWAY, fetched through the proxy at ./api/gw/<name>/...
+    //
+    // ⚠ USE ALL CONNECTED DATA — NOT JUST PRISM TABLES. If the project-spec has a
+    //   `## Linked API Gateways` section, the user IS connected to those gateways, and many have NO
+    //   Prism table (e.g. Meta/`fbads` campaigns). Add ONE rest source per gateway you want to surface
+    //   and merge its normalized rows into the matching rowset — otherwise that platform's data is
+    //   silently missing (the "my Meta campaigns don't show" bug). See connections/CONNECTIONS.md §6.
+    //
+    // category is REQUIRED for marketing apps: 'ad' = paid media (spend/impressions/clicks/CTR/CPC/
+    //   platform conversions, NO sessions); 'analytics' = GA4/Adobe (sessions/behavior/attributed
+    //   revenue, NO spend). Never SUM spend onto analytics rows or attribute sessions to ad rows.
+    //   `provider` is the human label shown in each metric's source line on hover.
+    primary:{ kind:'prism', prism:'campaigns', category:'ad', provider:'Ad platform', dateCol:'event_date', defaultPreset:'last_30d' },  // open on a bounded window (fast first load), not all-time
+    // example analytics table: ga4:{ kind:'prism', prism:'ga4_sessions', category:'analytics', provider:'GA4', dateCol:'session_date' }
+    // example GATEWAY source (no Prism table — pulled live via the linked gateway):
+    //   meta:{ kind:'rest', base:'/fbads/v19.0', path:'/me/adaccounts', params:{fields:'id,name'}, map:j=>(j.data||[]), category:'ad', provider:'Meta Ads', dateCol:'event_date' }
+  },
+  slicers:[
+    { id:'date_range', label:'Date', type:'date', scope:'global' },
+    { id:'platform',   label:'Platform', field:'platform', type:'chip', scope:'global' },
+    { id:'device',     label:'Device',   field:'device',   type:'chip', scope:'global' },
+    { id:'objective',  label:'Objective',field:'objective',type:'chip', scope:'global' },
+  ],
+  pinnedSlicers:['platform','device'],
+  sections:[
+    {
+      id:'catalog', label:'Catalog', icon:'table', layout:'data-table', source:'primary',
+      subtitle:'Browse and search every record. No time dimension — filter by attributes.',
+      tableTitle:'Records',
+      table:{
+        columns:[
+          { key:'creative', label:'', type:'image', sortable:false },
+          { key:'campaign_name', label:'Name', type:'text', source:'Ad platforms', tooltip:'Record name.' },
+          { key:'platform', label:'Platform', type:'badge', source:'Ad platforms', tooltip:'Originating platform.' },
+          { key:'objective', label:'Objective', type:'badge', source:'Ad platforms', tooltip:'Campaign objective.' },
+          { key:'status', label:'Status', type:'status', source:'Ad platforms', tooltip:'Serving status.' },
+          { key:'conversions', label:'Conversions', type:'number', source:'Analytics', tooltip:'SUM(conversions) for this record.' },
+          { key:'revenue', label:'Revenue', type:'currency', source:'Analytics', tooltip:'SUM(attributed revenue) for this record.' },
+        ],
+        filters:[ {field:'platform',label:'Platform',kind:'select'}, {field:'objective',label:'Objective',kind:'select'}, {field:'status',label:'Status',kind:'select'} ],
+      },
+    },
+  ],
+  chatStarters:[
+    'Why did Total Spend change vs. prior period?',
+    'What platform is driving Revenue?',
+    'Compare Avg ROAS by device.',
+    'Show me an anomaly in the last 7 days.',
+  ],
+  optimize:null, // campaign apps may set an OptimizeConfig here (see OPTIMIZE_MODULE_SPEC.md)
+};
+
+/* ══════════════════════════ ALPINE FACTORY ══════════════════════════ */
+function app(){
+  return {
+    appName:APP_CONFIG.title, appInitial:APP_CONFIG.appInitial, appLogo:APP_CONFIG.logo||'', askyLogo:ASKY_LOGO, askyCube:ASKY_CUBE,
+    sections:APP_CONFIG.sections, slicers:APP_CONFIG.slicers, chatStarters:APP_CONFIG.chatStarters,
+    section:APP_CONFIG.sections[0].id, sidebarOpen:true,
+    dataSource:'real', loading:false, error:null, freshness:'just now',
+    range:{ preset:APP_CONFIG.dataSources.primary.defaultPreset||'last_30d', from:null, to:null },
+    granularity:'D', hideDate:APP_CONFIG.hideDate||false,
+    customRangeOpen:false, customFrom:'', customTo:'', crY:null, crM:null,   // crY/crM = the calendar month on view
+    filters:{ global:[], drill:[], chat:[] },      // chat is now a real 4th scope (point 3)
+    sectionFilters:{}, sectionFilterOpen:null, colFilterOpen:null, sortState:{}, expandedRows:{},
+    tablePageSize:50, tablePage:{},                 // (legacy pagination fields — tables now show all rows in a scroll area)
+    tableDisplayCap:1000,                           // DOM safety cap: render up to this many rows; more → scroll shows first N + a note (Copy still exports all)
+    openSlicers:[], slicerValues:{}, commandPaletteOpen:false, paletteMode:'search',
+    widgets:[], widgetBuilderOpen:false, wTitle:'', wMetricKey:'', wBreakdown:'', wType:'bar',
+    drillHistory:[], peek:null, tip:{ show:false, html:'', x:0, y:0 },
+
+    toasts:[], _tid:0, _rows:[], _sourceRows:{}, _charts:{}, _asOf:null,   // _asOf = latest date in the loaded data (2e); null ⇒ fall back to the system clock
+    _triedSynthFallback:false,   // auto-fallback to synthetic once when no live endpoint is reachable (no toggle)
+    _loadedRange:{}, _loadedMode:null, _asOfProbed:false,   // fetch cache: reuse rows unless the date window widens or the data mode changes (perf)
+    _asOfBySource:{},   // per-source latest date → drives the per-tab freshness badge
+    chatOpen:false, chatMessages:[], chatInput:'', chatProcessing:false, chatStatus:'', chatInvestigationId:null, chatCursor:0,
+
+    /* ── lifecycle ── */
+    async init(){
+      this.widgets = safeGet('widgets', []);
+      const h=location.hash.slice(1); if(h && this.sections.some(s=>s.id===h)) this.section=h;
+      this.$watch('section', ()=>{ location.hash=this.section; this.recomputeSection(); });
+      this._sourceRows={}; for(const id of Object.keys(APP_CONFIG.dataSources)) this._sourceRows[id]=synthForSource(id);
+      this._rows=this._sourceRows.primary||[];
+      this.deriveSlicerValues();
+      window.addEventListener('resize', ()=>Object.values(this._charts).forEach(c=>{ try{ c&&c.resize(); }catch(e){} }));
+      await this.reloadAll();
+    },
+    icon(n){ return ICONS[n]||''; },
+    currentSection(){ return this.sections.find(s=>s.id===this.section)||this.sections[0]; },
+    navigate(id){ this.section=id; },
+    deriveSlicerValues(){ const all=[].concat(...Object.values(this._sourceRows||{})); const rows=all.length?all:(this._rows||[]);
+      // field-presence guard: a slicer only sees rows that HAVE its field, so per-source slicers don't cross-bleed.
+      for(const s of this.slicers){ if(s.field) this.slicerValues[s.id]=[...new Set(rows.filter(r=>s.field in r).map(r=>r[s.field]))].filter(v=>v!=null && v!==''); } },
+
+    /* ── Real vs Synthetic data source ──
+       'synthetic' = the built-in demo dataset (works offline, deterministic — for local preview/recording).
+       'real'      = live data from your Prism via the connection layer (getModelView). Deployed under your
+                     app slug it reads through the session cookie; from local preview there's no endpoint, so
+                     it surfaces an explanatory banner instead of silently showing fake numbers. */
+    // Fetch WHERE — DATE BOUNDS ONLY (perf). Categorical filters are applied CLIENT-SIDE in
+    // rowsForSection, never pushed to the query — so toggling a filter never triggers a refetch (the
+    // cached window already holds every category), and only widening the date window can force one.
+    buildWhere(dateCol, range){
+      const cl=[];
+      const {from,to}=range||this.resolveRange();
+      if(dateCol && from) cl.push(`${escapeIdent(dateCol)} >= '${escapeSqlLiteral(from)}'`);
+      if(dateCol && to)   cl.push(`${escapeIdent(dateCol)} <= '${escapeSqlLiteral(to)}'`);
+      return cl.length? ' WHERE '+cl.join(' AND ') : '';
+    },
+    // Does the already-fetched window `loaded` fully contain the window `need`? null bound = unbounded.
+    _rangeCovers(loaded, need){
+      if(!loaded) return false;
+      const coversFrom = loaded.from==null || (need.from!=null && loaded.from<=need.from);
+      const coversTo   = loaded.to==null   || (need.to!=null   && loaded.to>=need.to);
+      return coversFrom && coversTo;
+    },
+    async loadData(){
+      // GENERIC MULTI-SOURCE LOADER — loads EVERY entry in APP_CONFIG.dataSources, both Prism tables
+      // (kind:'prism', via getModelView) AND linked API gateways (kind:'rest', via the gw() proxy).
+      // Rows are stored per source id in _sourceRows; _rows mirrors `primary` for back-compat.
+      // Idempotent both ways: synthetic ALWAYS regenerates, real ALWAYS refetches.
+      const ids=Object.keys(APP_CONFIG.dataSources);
+      if(this.dataSource==='synthetic'){
+        this._sourceRows={}; for(const id of ids) this._sourceRows[id]=synthForSource(id);
+        this._rows=this._sourceRows.primary||[]; this.error=null; this.deriveSlicerValues();
+        this._asOf=this._computeAsOfFromRows(); this.freshness=this._freshnessLabel(); return;
+      }
+      // 2e: resolve the data's as-of date FIRST, so the windowed WHERE below anchors to days the data
+      // actually has (a lagging snapshot + a clock-anchored window = zero rows). Probed ONCE per data
+      // mode — a snapshot's latest date doesn't move within a session, so we don't pay for it every reload.
+      if(!this._asOfProbed){ this._asOf=await this._probeAsOf(); this._asOfProbed=true; }
+      // FAIL LOUD PER SOURCE: a failing source surfaces its own banner; the generic "no endpoint" banner
+      // shows only when nothing loads at all. Build into a LOCAL map first, commit only after the fallback
+      // decision — so a failing live fetch never wipes pre-seeded synthetic rows before the fallback runs.
+      // PERF: sources load in PARALLEL, and each is SKIPPED when the cache already covers what's needed —
+      // same data mode + the loaded window already contains the needed window (filters are client-side, so
+      // only a wider date range forces a refetch). This makes filter toggles and date-narrowing instant.
+      const fails=[]; const res={};
+      await Promise.all(ids.map(async id=>{
+        const ds=APP_CONFIG.dataSources[id];
+        const need=this._loadRange(ds);
+        if(this.dataSource===this._loadedMode && this._sourceRows[id] && this._rangeCovers(this._loadedRange[id], need)){
+          res[id]=this._sourceRows[id]; return;   // cache hit — no network
+        }
+        try{ res[id]=(await this.loadSource(id,ds))||[]; this._loadedRange[id]=need; }
+        catch(e){ res[id]=[]; fails.push({src:ds.provider||id, e}); }
+      }));
+      const total=ids.reduce((n,id)=>n+(res[id]||[]).length,0);
+      // No data toggle anymore: when no live endpoint is reachable (local/offline preview), fall back to
+      // the built-in synthetic dataset ONCE so the app still renders instead of showing a dead banner.
+      // Deployed under its slug the live fetch succeeds and this never triggers. Return BEFORE committing
+      // res, so the recursive synthetic load owns _sourceRows outright.
+      if(!total && fails.length && !this._triedSynthFallback){
+        this._triedSynthFallback=true; this.dataSource='synthetic'; return await this.loadData();
+      }
+      this._sourceRows=res; this._loadedMode=this.dataSource;
+      this._rows=this._sourceRows.primary||[];
+      this.deriveSlicerValues();
+      // Fall back to the max date across loaded rows if no source could be probed (e.g. REST-only apps).
+      this._asOf = this._asOf || this._computeAsOfFromRows();
+      this.freshness=this._freshnessLabel();
+      if(!total && fails.length) this.error='No data endpoint reachable and synthetic fallback unavailable. Deploy under the app slug (cookie auth) or run connections/dev-proxy.mjs.';
+      else if(fails.length) this.error=fails.map(f=>`${f.src} query failed: ${(f.e&&f.e.message)||'error'}`).join(' · ');
+      else if(!total) this.error='Real mode: queries returned no rows for the current filters.';
+      else this.error=null;
+    },
+    // Load ONE source. Prism table → getModelView SELECT *; API gateway/REST → the gw() proxy via queryAny.
+    // Override per app with a custom loader when a gateway needs a multi-call fetch (list → per-entity
+    // insights) or JS normalization before its rows match the table rowset.
+    async loadSource(id, ds){
+      if(ds.kind==='rest'){
+        const spec={ path: ds.path||'', params: (typeof ds.params==='function'? ds.params(this) : ds.params) };
+        return await queryAny(ds, spec);   // gw('/<name>/...') — sends X-Workspace-Id + credentials:'include'
+      }
+      // Load the active∪default window (not just the active filter) so a collapsed breakdown can fall
+      // back to its full default range client-side; rowsForSection() re-narrows to the active filter.
+      const sql=`SELECT * FROM ${escapeIdent(ds.prism)}${this.buildWhere(ds.dateCol, this._loadRange(ds))} LIMIT 5000`;
+      return await queryModel(ds.prism, sql);
+    },
+    // Single source of truth for the data mode. Flipping it drops ALL prior datasets + chat session and
+    // triggers a full reload, so Synthetic⇄Real is symmetric and idempotent (never a stale relabel).
+    async setDataMode(mode){
+      if(mode!=='real' && mode!=='synthetic') return;
+      this.dataSource=mode; this._rows=[]; this._sourceRows={}; this.chatInvestigationId=null; this.chatMessages=[]; this.error=null;
+      this._loadedRange={}; this._loadedMode=null; this._asOfProbed=false;   // drop the fetch cache — the new mode must refetch
+      await this.reloadAll();
+    },
+
+    /* ── data load (per-section, resilient per-tile) ── */
+    // Serialize every (re)load through one promise chain. Two reloads that overlap (double init, rapid
+    // filter/tab clicks, a data-mode switch mid-fetch) would otherwise race on _sourceRows — a stale pass
+    // could commit its empty result on top of a newer pass's rows. Chaining guarantees the newest load
+    // runs last and owns the final state. loadData()'s internal synthetic-fallback recursion is awaited
+    // inline (not re-chained), so it never deadlocks.
+    _serialize(fn){ this._loadChain=(this._loadChain||Promise.resolve()).then(fn,fn); return this._loadChain; },
+    async reloadAll(){ return this._serialize(async()=>{ this.loading=true;
+      try{ await this.loadData(); for(const s of this.sections) await this.loadSection(s); this.$nextTick(()=>this.renderSection(this.currentSection())); }
+      catch(e){ this.error=(e&&e.message)||String(e); }
+      finally{ this.loading=false; } }); },
+    // Spinner ON from the very start — through loadData (the slow real-mode fetch) + render — so switching
+    // a filter (date, etc.) always shows it's loading and never looks stuck. Cleared even on error.
+    async reloadSection(){ return this._serialize(async()=>{ const sec=this.currentSection(); this.loading=true;
+      try{ await this.loadData(); await this.loadSection(sec); this.$nextTick(()=>this.renderSection(sec)); }
+      catch(e){ this.error=(e&&e.message)||String(e); }
+      finally{ this.loading=false; } }); },
+    // 2f — FETCH on data-defining inputs, COMPUTE on presentation inputs. A tab switch changes only what
+    // is shown: reloadAll() has already loaded every source into _sourceRows up front, so switching
+    // sections must recompute + re-render the target tab WITHOUT another round-trip (no getModelView, no
+    // cold-start wait). Re-fetch stays with reloadSection, reserved for data-defining changes — date
+    // range, filters that reach the WHERE, and the data-mode switch. (See DESIGN.md §fetch-vs-compute.)
+    recomputeSection(){ const sec=this.currentSection(); this.loadSection(sec); this.$nextTick(()=>this.renderSection(sec)); },
+    // Rows for a source id (a section's `source`); falls back to primary. Gateway + table sources alike.
+    rowsBySource(src){ return (this._sourceRows && this._sourceRows[src]) || this._rows || []; },
+    // Inclusive day count between two YYYY-MM-DD dates (0 if either missing or hi<lo).
+    _dayCount(lo,hi){ if(!lo||!hi) return 0; const d=(new Date(hi+'T00:00:00')-new Date(lo+'T00:00:00'))/86400000; return d>=0?Math.floor(d)+1:0; },
+    /* ── 2e: as-of date (the data's latest day) ──
+       Everything time-relative — the date presets, the "current period", the freshness badge — anchors
+       to this instead of `new Date()`. */
+    // Real mode: one cheap MAX(dateCol) probe per dated Prism source, BEFORE the windowed fetch, so the
+    // WHERE window lands on days the data actually has. Best-effort: any failure leaves the prior value
+    // (ultimately the system-clock fallback in resolvePreset). REST/gateway sources are skipped here and
+    // covered by _computeAsOfFromRows once their rows are in.
+    async _probeAsOf(){
+      // Probe MAX(dateCol) for every dated Prism source IN PARALLEL. Keep BOTH the per-source dates
+      // (_asOfBySource — drives the per-tab freshness badge) and the global max (returned — anchors the
+      // shared date picker). Best-effort per source.
+      const ids=Object.keys(APP_CONFIG.dataSources).filter(id=>{ const ds=APP_CONFIG.dataSources[id]; return ds.kind==='prism' && ds.dateCol; });
+      const pairs=await Promise.all(ids.map(async id=>{
+        const ds=APP_CONFIG.dataSources[id];
+        try{
+          const rows=await queryModel(ds.prism, `SELECT MAX(${escapeIdent(ds.dateCol)}) AS m FROM ${escapeIdent(ds.prism)}`);
+          const cell=rows && rows[0] ? (rows[0].m ?? rows[0].M ?? Object.values(rows[0])[0]) : null;
+          return [id, cell ? String(cell).slice(0,10) : null];
+        }catch(e){ return [id, null]; }
+      }));
+      this._asOfBySource={}; let best=null;
+      for(const [id,iso] of pairs){ if(iso){ this._asOfBySource[id]=iso; if(!best||iso>best) best=iso; } }
+      return best;
+    },
+    // Latest date across whatever rows are already in memory (any source that declares a dateCol).
+    _computeAsOfFromRows(){
+      let best=null;
+      for(const id of Object.keys(this._sourceRows||{})){
+        const dc=(APP_CONFIG.dataSources[id]||{}).dateCol; if(!dc) continue;
+        for(const r of (this._sourceRows[id]||[])){ const v=r[dc]; if(v){ const iso=String(v).slice(0,10); if(!best||iso>best) best=iso; } }
+      }
+      return best;
+    },
+    // Latest date for ONE source — from the probe if available, else measured from its loaded rows.
+    _sourceAsOf(id){
+      if(this._asOfBySource && this._asOfBySource[id]) return this._asOfBySource[id];
+      const dc=(APP_CONFIG.dataSources[id]||{}).dateCol; if(!dc) return this._asOf;
+      let best=null; for(const r of (this._sourceRows[id]||[])){ const v=r[dc]; if(v){ const iso=String(v).slice(0,10); if(!best||iso>best) best=iso; } }
+      return best || this._asOf;
+    },
+    // As-of date for the CURRENT tab: the latest date in the tab's own source (not a global max). This is
+    // why the badge can differ per tab — each tab states the recency of the data it actually shows.
+    sectionAsOf(){ return this._sourceAsOf(((this.currentSection()||{}).source)||'primary'); },
+    // Freshness badge text — states the day THIS tab's data actually reaches (2e), not "just now".
+    freshnessText(){
+      const a=this.sectionAsOf();
+      if(!a) return 'as of now';
+      try{ return 'data through '+new Date(a+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }
+      catch(e){ return 'data through '+a; }
+    },
+    freshnessTip(){
+      const src=((this.currentSection()||{}).source)||'primary';
+      return `The latest date present in this tab's data (source: <b>${src}</b>). Each tab shows the recency of its own source, so this can differ between tabs. The date picker above spans all data.`;
+    },
+    _freshnessLabel(){ return this.freshnessText(); },   // kept for back-compat callers
+    _addDays(s,n){ const d=new Date(s+'T00:00:00'); d.setDate(d.getDate()+n); return isoOf(d); },
+    // Prorate a flighted campaign to the days its flight overlaps [from,to]: in-range metrics, not
+    // whole-flight totals. Stamps _rangeFrom/_rangeTo/_rangeDays so dailyRows lists exactly the
+    // active days. Rows without a flight pass through unchanged.
+    _prorate(r,from,to){
+      if(!r.active_from || !r.active_to) return r;
+      const lo=(from && from>r.active_from)?from:r.active_from;
+      const hi=(to   && to  <r.active_to )?to  :r.active_to;
+      const days=this._dayCount(lo,hi);
+      if(days<=0) return {...r, spend:0, impressions:0, clicks:0, conversions:0, revenue:0, ctr:0, roas:0, cpa:null, _rangeDays:0};
+      const spend=(r._dSpend||0)*days, impr=Math.round((r._dImpr||0)*days),
+            clicks=Math.round((r._dClicks||0)*days), conv=Math.round((r._dConv||0)*days), rev=(r._dRev||0)*days;
+      return {...r, spend, impressions:impr, clicks, conversions:conv, revenue:rev,
+              ctr: impr?clicks/impr:0, roas: spend?rev/spend:0, cpa: conv?spend/conv:null,
+              _rangeFrom:lo, _rangeTo:hi, _rangeDays:days };
+    },
+    // opts.range overrides the active date filter (used by breakdown visuals that would collapse to a
+    // single bucket — they fall back to their full default range instead). Slicers always still apply.
+    rowsForSection(secArg,opts){
+      opts=opts||{};
+      const sec=secArg||this.currentSection();
+      let rows=this.rowsBySource((sec && sec.source) || 'primary');
+      if(!this.hideDate){
+        const {from,to}=opts.range||this.resolveRange();
+        const dc=(APP_CONFIG.dataSources[sec&&sec.source]||APP_CONFIG.dataSources.primary).dateCol;
+        if(from||to){
+          // flighted campaign → keep only if its active window OVERLAPS the range; point row → date-in-range.
+          rows=rows.filter(x=>{
+            if(x.active_from && x.active_to) return (!to || x.active_from<=to) && (!from || x.active_to>=from);
+            const v=x[dc]; if(v==null) return true; return (!from||v>=from)&&(!to||v<=to);
+          });
+        }
+        rows=rows.map(x=>this._prorate(x, from, to));   // in-range metrics (no-op for point rows)
+      }
+      // A filter only applies to rows that HAVE its field, so per-source slicers don't blank other sources.
+      // opts.skipFilter(r) lets a single visual opt out of a filter that would collapse it (categorical rule).
+      const apply=(r,neg)=>{ if(opts.skipFilter && opts.skipFilter(r)) return; rows=rows.filter(x=>!(r.field in x)? true : (neg? !r.values.includes(x[r.field]) : r.values.includes(x[r.field]))); };
+      for(const r of this.filters.global){ apply(r, r.op==='not_in'); }
+      for(const r of this.filters.drill){ apply(r, false); }
+      for(const r of this.filters.chat){ apply(r, false); }
+      return rows;
+    },
+    async loadSection(sec){
+      this.error=null;   // `loading` is owned by reloadSection/reloadAll so it spans the whole fetch (incl. loadData), not just this step
+      try{
+        const rows=this.rowsForSection(sec);
+        // KPIs — each wrapped independently so one failure can't blank the tab (point 6)
+        if(sec.kpis) for(const k of sec.kpis){
+          try{
+            let v;
+            if(k.agg==='ratio'){
+              // 2b — a ratio/rate is the POOLED SUM(numerator) ÷ SUM(denominator) over the SAME row scope,
+              // never AVG of per-row ratios (that weights a $10 row equally with a $10k row). `num`/`den`
+              // name the raw additive columns (e.g. ROAS: num:'revenue', den:'spend').
+              const num=rows.reduce((a,r)=>a+(+r[k.num]||0),0), den=rows.reduce((a,r)=>a+(+r[k.den]||0),0);
+              v = den ? num/den : 0;
+            } else {
+              const vals=rows.map(r=>+r[k.expr]||0);
+              v = k.agg==='sum'? vals.reduce((a,b)=>a+b,0)
+                : k.agg==='avg'? (vals.length? vals.reduce((a,b)=>a+b,0)/vals.length:0)
+                : k.agg==='distinct'? new Set(rows.map(r=>r[k.expr])).size : 0;
+            }
+            const f=fmt(k.format,v); k._val=f.label; k._exact=f.exact;
+            k._delta=(Math.sin(v)*8);
+          }catch(e){ k._val='—'; k._err=true; }
+        }
+        if(sec.charts) for(const c of sec.charts){
+          try{
+            // Every filter applies to every visual, with two independent exceptions, each dropping ONLY
+            // the offending filter for THIS visual (all others still apply):
+            //  • time filter — skipped on a time breakdown whose active range spans one bucket at its grain;
+            //  • categorical filter — skipped on a breakdown whose own dimension the filter narrows to one
+            //    category. Both would collapse the visual to a single data point. (rowsForChart.)
+            c._unfiltered=this.chartShowsContext(sec,c);           // showing a wider time-context window than the filter?
+            c._skippedFilters=this._skippedCatFields(sec,c);       // categorical filters skipped (by field)
+            c._data=this.aggregate(this.rowsForChart(sec,c),c);
+          }catch(e){ c._data=[]; c._err=true; c._unfiltered=false; c._skippedFilters=[]; }
+        }
+
+        // freshness is owned by loadData (derived from the data's as-of date, 2e) — not re-stamped per section.
+      }catch(e){ this.error=e.message; }
+    },
+    aggregate(rows,c){
+      if(c.type==='scatter'){ return rows.slice(0,200).map(r=>({ label:r[c.dimension], x:+r[c.metric]||0, y:+r[c.metricY]||0 })); }
+      if(c.type==='dualAxis'){   // two metrics over one dimension → {label, v1, v2}; each metric aggregated independently
+        const isDate=isTimeField(c.dimension); const g=isDate?(c.grain||this.autoGrain(rows,c.dimension)):null; const m={};
+        for(const r of rows){ const key=isDate?dateBucketKey(r[c.dimension],g):r[c.dimension]; if(key==null) continue;
+          (m[key]=m[key]||{v1:0,v2:0,n1:0,d1:0,n2:0,d2:0,n:0}); m[key].v1+=(+r[c.metric]||0); m[key].v2+=(+r[c.metricY]||0);
+          m[key].n1+=(+r[c.num]||0); m[key].d1+=(+r[c.den]||0); m[key].n2+=(+r[c.numY]||0); m[key].d2+=(+r[c.denY]||0); m[key].n++; }
+        const a1=c.agg, a2=(c.aggY||c.agg);
+        // 2b: a 'ratio' axis pools SUM(num)/SUM(den) per bucket; 'avg' averages; else sums.
+        const val=(o,agg,vk,nk,dk)=> agg==='ratio' ? (o[dk]? o[nk]/o[dk] : 0) : agg==='avg' ? (o.n? o[vk]/o.n : 0) : o[vk];
+        let keys=Object.keys(m); keys = isDate ? keys.sort() : keys.sort((a,b)=>m[b].v1-m[a].v1);
+        return keys.map(k=>({label:k, v1:val(m[k],a1,'v1','n1','d1'), v2:val(m[k],a2,'v2','n2','d2')}));
+      }
+      if(isTimeField(c.dimension)){
+        const g=c.grain||this.autoGrain(rows,c.dimension);
+        if(c.agg==='ratio'){   // 2b: pooled ratio per time bucket, never a sum/avg of per-row ratios
+          const m={}; for(const r of rows){ const key=dateBucketKey(r[c.dimension],g); if(key==null) continue; (m[key]=m[key]||{n:0,d:0}); m[key].n+=(+r[c.num]||0); m[key].d+=(+r[c.den]||0); }
+          return Object.keys(m).sort().map(k=>({label:k, value: m[k].d? m[k].n/m[k].d : 0}));
+        }
+        const m={}; for(const r of rows){ const key=dateBucketKey(r[c.dimension],g); if(key==null) continue; m[key]=(m[key]||0)+(+r[c.metric]||0); }
+        return Object.keys(m).sort().map(k=>({label:k,value:m[k]}));
+      }
+      if(c.agg==='ratio'){   // 2b: pooled ratio per category
+        const m={}; for(const r of rows){ const g=r[c.dimension]; (m[g]=m[g]||{n:0,d:0}); m[g].n+=(+r[c.num]||0); m[g].d+=(+r[c.den]||0); }
+        let out=Object.keys(m).map(g=>({label:g, value: m[g].d? m[g].n/m[g].d : 0}));
+        out.sort((a,b)=> c.sort==='asc'? a.value-b.value : b.value-a.value);
+        return out;
+      }
+      const groups={};
+      for(const r of rows){ const g=r[c.dimension]; (groups[g]=groups[g]||[]).push(+r[c.metric]||0); }
+      let out=Object.keys(groups).map(g=>({label:g, value: c.agg==='avg'? groups[g].reduce((a,b)=>a+b,0)/groups[g].length : groups[g].reduce((a,b)=>a+b,0)}));
+      out.sort((a,b)=> c.sort==='asc'? a.value-b.value : b.value-a.value);
+      return out;
+    },
+
+
+        /* ── chart rendering + peek-popover drill ── */
+    renderSection(sec){
+      (sec.kpis||[]).forEach((k,ki)=>{
+        const el=document.getElementById(`spark-${sec.id}-${ki}`); if(!el) return;
+        const inst=echarts.getInstanceByDom(el)||echarts.init(el,null,{renderer:'svg'});
+        const data=Array.from({length:12},(_,i)=>50+Math.sin(i+ki)*20+i);
+        inst.setOption({grid:{left:0,right:0,top:2,bottom:0},xAxis:{type:'category',show:false},yAxis:{type:'value',show:false},tooltip:{show:false},
+          series:[{type:'line',data,smooth:.3,symbol:'none',lineStyle:{width:2,color:chartColor(k.favorableUp?2:1)},areaStyle:{color:chartColor(k.favorableUp?2:1),opacity:.1}}]});
+        inst.resize(); // re-fit: container may have been hidden/narrow at init time
+      });
+      (sec.charts||[]).forEach((c,ci)=>{
+        const el=document.getElementById(`chart-${sec.id}-${ci}`); if(!el) return;
+        const inst=echarts.getInstanceByDom(el)||echarts.init(el,null,{renderer:'svg'});
+        inst.setOption(this.chartOption(c), true);
+        inst.resize(); // re-fit: container may have been hidden/narrow at init time
+        inst.off('click'); inst.on('click', (p)=>this.openPeek(c,p));
+        this._charts[`${sec.id}-${ci}`]=inst;
+      });
+
+    },
+    // Human-readable axis label from a field/metric key (event_date → "Date", campaign_name → "Campaign").
+    pfLabel(s){ if(!s) return ''; const m={event_date:'Date',session_date:'Date',date:'Date',campaign_name:'Campaign',campaign:'Campaign'};
+      const k=String(s).toLowerCase(); if(m[k]) return m[k];
+      return String(s).replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase()); },
+    chartOption(c){
+      const data=c._data||[]; const base={
+        animation:false, grid:{left:2,right:10,top:24,bottom:38,containLabel:true},
+        tooltip:{trigger: c.type==='donut'?'item':'axis', backgroundColor:cssVar('--surface-elevated'), borderColor:chartColor(6), borderWidth:1,
+          textStyle:{color:cssVar('--foreground'),fontSize:12}, extraCssText:'box-shadow:0 2px 8px rgba(0,0,0,.06);border-radius:8px;'},
+      };
+      // every axis carries a name: value axes name the metric, category axes name the dimension.
+      const nm={color:chartColor(6),fontSize:10,fontWeight:600};
+      const gridLine={lineStyle:{color:chartColor(6),type:'dashed',opacity:.4}};
+      // pos 'x' → name centered below; pos 'y' → name at the top of the axis, horizontal (no big margin)
+      const valAxis=(name,pos)=>({type:'value',name,nameLocation:pos==='y'?'end':'middle',nameGap:pos==='y'?10:26,nameTextStyle:pos==='y'?{...nm,align:'left'}:nm,
+        axisLine:{show:false},axisTick:{show:false},splitLine:gridLine,axisLabel:{color:chartColor(6),fontSize:11,formatter:v=>formatAbbrev(v)}});
+      // Categorical axes must label EVERY value — a discrete category is never silently thinned
+      // out (that hides real data points). Only a time axis may thin: dates are continuous, so
+      // dropping some tick labels loses nothing. See DESIGN.md §"Show every categorical value".
+      const isTimeDim=d=>/(^|_)(date|time|day|week|month|quarter|year|hour|minute)s?($|_)/i.test(String(d||''));
+      const catAxis=(cats,name,pos,dim)=>{
+        const time=isTimeDim(dim);
+        const lbl={color:chartColor(6),fontSize:11};
+        if(!time){
+          lbl.interval=0;          // one label per category — never skip a discrete value
+          lbl.hideOverlap=false;   // …and never drop one just because it collides with a neighbour
+          if(pos==='x') lbl.rotate = cats.length>6?35:(cats.some(c=>String(c).length>8)?25:0);
+          if(pos==='y'){ lbl.width=120; lbl.overflow='truncate'; }  // long names ellipsize; every row stays labelled
+        }
+        return {type:'category',data:cats,name,nameLocation:pos==='y'?'end':'middle',nameGap:pos==='y'?10:26,nameTextStyle:pos==='y'?{...nm,align:'left'}:nm,
+          ...(pos==='y'?{inverse:true}:{}),axisLine:{show:false},axisTick:{show:false},axisLabel:lbl};
+      };
+      if(c.type==='line'||c.type==='area'){
+        return {...base, xAxis:catAxis(data.map(d=>d.label), this.pfLabel(c.dimension), 'x', c.dimension),
+          yAxis:valAxis(this.pfLabel(c.metric),'y'),
+          series:[{type:'line',data:data.map(d=>d.value),smooth:.3,symbolSize:0,lineStyle:{width:2.5,color:chartColor(c.palette)},areaStyle:{color:chartColor(c.palette),opacity:c.type==='area'?0.28:0.12}}]};
+      }
+      if(c.type==='scatter'){
+        return {...base, tooltip:{...base.tooltip, trigger:'item', formatter:p=>`${p.data.name}<br/>${c.metric}: ${fmt('count',p.value[0]).label} · ${c.metricY}: ${fmt('count',p.value[1]).label}`},
+          xAxis:valAxis(this.pfLabel(c.metric),'x'),
+          yAxis:valAxis(this.pfLabel(c.metricY),'y'),
+          series:[{type:'scatter',symbolSize:11,itemStyle:{color:chartColor(c.palette),opacity:.7},data:(c._data||[]).map(d=>({value:[d.x,d.y],name:d.label}))}]};
+      }
+      if(c.type==='dualAxis'){
+        // Two metrics whose scales differ too much to share one axis (e.g. spend in $M vs ROAS ~5x):
+        // left axis + bars for metric, right axis + line for metricY. Each series AND its axis (line,
+        // name, ticks) share a color so it's unambiguous which value belongs to which side.
+        const cA=chartColor(c.palette||1), cB=chartColor((c.palette||1)+1);
+        const cats=data.map(d=>d.label);
+        const yA={type:'value',name:this.pfLabel(c.metric),nameLocation:'end',nameGap:10,position:'left',
+          nameTextStyle:{color:cA,fontSize:10,fontWeight:600,align:'left'},axisLine:{show:true,lineStyle:{color:cA}},
+          axisTick:{show:false},splitLine:gridLine,axisLabel:{color:cA,fontSize:11,formatter:v=>formatAbbrev(v)}};
+        const yB={type:'value',name:this.pfLabel(c.metricY),nameLocation:'end',nameGap:10,position:'right',
+          nameTextStyle:{color:cB,fontSize:10,fontWeight:600,align:'right'},axisLine:{show:true,lineStyle:{color:cB}},
+          axisTick:{show:false},splitLine:{show:false},axisLabel:{color:cB,fontSize:11,formatter:v=>formatAbbrev(v)}};
+        return {...base, tooltip:{...base.tooltip, trigger:'axis'},
+          grid:{...base.grid, right:52, bottom:44},
+          legend:{show:true,bottom:0,textStyle:{color:chartColor(6),fontSize:10}},
+          xAxis:catAxis(cats,this.pfLabel(c.dimension),'x',c.dimension),
+          yAxis:[yA,yB],
+          series:[
+            {name:this.pfLabel(c.metric),  type:'bar',  yAxisIndex:0, data:data.map(d=>d.v1), itemStyle:{color:cA,borderRadius:[3,3,0,0]}, barMaxWidth:26},
+            {name:this.pfLabel(c.metricY), type:'line', yAxisIndex:1, data:data.map(d=>d.v2), smooth:.3, symbolSize:5, lineStyle:{width:2.5,color:cB}, itemStyle:{color:cB}}
+          ]};
+      }
+      if(c.type==='donut'){
+        // Every slice is drawn — no silent top-N cap. A scrollable legend names all of them,
+        // and each label carries its value + share, so no category is dropped from the picture.
+        const total=data.reduce((a,d)=>a+(d.value||0),0)||1;
+        return {...base, tooltip:{...base.tooltip, trigger:'item', formatter:p=>`${p.name}<br/>${fmt('count',p.value).label} · ${(p.percent||0).toFixed(1)}%`},
+          legend:{type:'scroll',orient:'horizontal',bottom:0,textStyle:{color:chartColor(6),fontSize:10},pageIconColor:chartColor(6)},
+          series:[{type:'pie',radius:['52%','76%'],center:['50%','46%'],avoidLabelOverlap:true,minAngle:2,
+            data:data.map((d,i)=>({name:d.label,value:d.value,itemStyle:{color:chartColor((i%6)+1)}})),
+            label:{formatter:p=>`${p.name}\n${formatAbbrev(p.value)} · ${(p.percent||0).toFixed(0)}%`,fontSize:10},
+            labelLine:{length:8,length2:6}}]};
+      }
+      if(c.type==='treemap'){
+        // Treemap = the "show all shares" answer for high-cardinality dimensions where a donut
+        // would collapse into slivers. Every category is a labelled, value-sized tile.
+        return {...base, tooltip:{...base.tooltip, trigger:'item', formatter:p=>`${p.name}<br/>${fmt('count',p.value).label}`},
+          series:[{type:'treemap',roam:false,nodeClick:false,breadcrumb:{show:false},top:6,bottom:6,left:2,right:2,
+            itemStyle:{borderColor:cssVar('--surface-elevated'),borderWidth:2,gapWidth:2},
+            label:{show:true,formatter:p=>`${p.name}\n${formatAbbrev(p.value)}`,fontSize:11,color:'#fff'},
+            data:data.map((d,i)=>({name:d.label,value:d.value,itemStyle:{color:chartColor((i%6)+1)}}))}]};
+      }
+      // bar / rankedBar (horizontal, strongest→softest top-to-bottom shading)
+      const horiz = c.type==='rankedBar';
+      const cats=data.map(d=>d.label), vals=data.map((d,i)=>({value:d.value, itemStyle:{color:chartColor(c.palette), opacity: horiz? Math.max(1-(i*0.12),0.4):1, borderRadius: horiz?[0,4,4,0]:[4,4,0,0]}}));
+      return {...base,
+        xAxis: horiz? valAxis(this.pfLabel(c.metric),'x') : catAxis(cats, this.pfLabel(c.dimension), 'x', c.dimension),
+        yAxis: horiz? catAxis(cats, this.pfLabel(c.dimension), 'y', c.dimension) : valAxis(this.pfLabel(c.metric),'y'),
+        series:[{type:'bar',data:vals,barMaxWidth:32}]};
+    },
+    openPeek(c,p){
+      // drill works on EVERY visual — bar, ranked, donut, line/area (by date), scatter (by entity)
+      const field=c.dimension, value=p.name!=null?p.name:(p.data&&p.data.name);
+      if(value==null) return;
+      const ev=p.event&&p.event.event;
+      const found=(c._data||[]).find(d=>d.label===value)||{};
+      const mv = c.type==='scatter' ? (found.y!=null?found.y:0) : (found.value!=null?found.value:0);
+      this.peek={ field, value, label:c.title, x:(ev?ev.clientX:200)+8, y:(ev?ev.clientY:200)+8,
+        metric:`${c.title}: ${fmt('count', mv).label}` };
+    },
+    digIn(){ if(this.peek){ this.drill(this.peek.field, this.peek.value); this.peek=null; } },
+    peekExclude(){ if(this.peek){ this.filters.global.push({field:this.peek.field,op:'not_in',values:[this.peek.value]}); this.toast(`Excluded — ${this.peek.field} = ${this.peek.value}`); const p=this.peek; this.peek=null; this.reloadSection(); } },
+    peekToChat(){ if(this.peek){ const p=this.peek; this.peek=null; this.chatOpen=true; this.chatSend(`Tell me about ${p.field} = ${p.value}`); } },
+
+    /* ── drill ── */
+    drill(field,value){
+      this.drillHistory.push(JSON.parse(JSON.stringify(this.filters.drill)));
+      const ex=this.filters.drill.find(r=>r.field===field);
+      if(ex){ if(!ex.values.includes(value)) ex.values.push(value); } else this.filters.drill.push({field,op:'in',values:[value]});
+      this.toast(`Drilled — ${field} = ${value}`); this.reloadSection();
+    },
+    drillBack(){ if(this.drillHistory.length){ this.filters.drill=this.drillHistory.pop(); this.reloadSection(); } },
+
+    /* ── filters / slicers ── */
+    pinnedGlobalSlicers(){ return this.slicers.filter(s=>APP_CONFIG.pinnedSlicers.includes(s.id)); },
+    /* ── command-palette search: tabs + data (campaign/entity names) + filters ── */
+    paletteSections(q){ const ql=(q||'').toLowerCase(); return this.sections.filter(s=>!ql||(s.label||'').toLowerCase().includes(ql)); },
+    paletteSlicers(q){ const ql=(q||'').toLowerCase(); return this.slicers.filter(s=>s.type!=='date' && (!ql||(s.label||'').toLowerCase().includes(ql))); },
+    // Full-text search across EVERY tab. All sections render to the DOM (x-show, not x-if), so each
+    // tab's rendered text — labels, subtitles, KPI values, chart titles, table headers + cell values —
+    // is searchable even while hidden. Returns one hit per matching tab with a context snippet; click
+    // navigates there. (Chart canvas labels aren't in the DOM, but those values also appear as text.)
+    // Tightest elements in a section root whose own text contains the query (no matching element-child).
+    _searchMatches(root, ql){ const hits=[];
+      const all=root.querySelectorAll('*');
+      for(const el of all){
+        if(el.children.length && [...el.children].some(ch=>(ch.textContent||'').toLowerCase().includes(ql))) continue; // a child is tighter
+        const t=(el.textContent||'').toLowerCase(); if(t.includes(ql)) hits.push(el);
+      }
+      return hits; },
+    // Full-text search across every tab → one clickable result PER matching element (not just per tab).
+    searchApp(q){ const ql=(q||'').trim().toLowerCase(); if(!ql) return []; const out=[];
+      for(const sec of this.sections){
+        const root=document.querySelector(`[data-sec-search="${sec.id}"]`); if(!root) continue;
+        const hits=this._searchMatches(root, ql);
+        hits.forEach((el,occ)=>{ if(out.length>=24) return;
+          const text=(el.textContent||'').replace(/\s+/g,' ').trim();
+          const idx=text.toLowerCase().indexOf(ql), a=Math.max(0,idx-24), b=Math.min(text.length, idx+ql.length+40);
+          const snippet=(a>0?'…':'')+text.slice(a,b)+(b<text.length?'…':'');
+          out.push({ key:sec.id+'-'+occ, id:sec.id, occ, label:sec.label, icon:sec.icon, snippet });
+        });
+      }
+      return out.slice(0,24); },
+    // Click a result → go to its tab, scroll the exact element into view, and flash it.
+    goToHit(m,q){ q=(q||'').trim().toLowerCase(); this.commandPaletteOpen=false;
+      this.navigate(m.id);
+      const find=()=>{ const root=document.querySelector(`[data-sec-search="${m.id}"]`); if(!root) return null;
+        const hits=this._searchMatches(root, q); return hits[m.occ]||hits[0]||null; };
+      // section re-renders on navigate; wait a couple frames, then scroll + flash
+      setTimeout(()=>{ const el=find(); if(!el) return;
+        el.scrollIntoView({behavior:'smooth', block:'center'});
+        el.classList.add('search-flash'); setTimeout(()=>el.classList.remove('search-flash'), 1800);
+      }, 260); },
+    paletteRows(q){ if(!q) return []; const ql=q.toLowerCase(); const names=new Set();
+      for(const id in (this._sourceRows||{})) for(const r of (this._sourceRows[id]||[])){ const n=r.campaign_name; if(n && (''+n).toLowerCase().includes(ql)) names.add(n); if(names.size>=8) break; }
+      return [...names].slice(0,8); },
+    paletteGoToRow(name){ const sec=this.sections.find(s=>s.table)||this.currentSection();
+      this.range.preset='all_time'; this.range.from=null; this.range.to=null;   // widen so the match is visible regardless of its flight
+      this.filters.drill=[{field:'campaign_name',op:'in',values:[name]}]; this.commandPaletteOpen=false; this.navigate(sec.id); this.reloadSection(); this.toast('Showing '+name); },
+    slicerById(id){ return this.slicers.find(s=>s.id===id)||{}; },
+    isSlicerOpen(id){ return this.openSlicers.some(o=>o.id===id); },
+    toggleSlicer(id){ this.isSlicerOpen(id)? this.closeSlicer(id) : this.openSlicers.push({id,mode:'in'}); },
+    closeSlicer(id){ this.openSlicers=this.openSlicers.filter(o=>o.id!==id); },
+    // include ('in') vs exclude ('not_in') per open slicer; flips the field's rule op if one exists.
+    slicerMode(id){ const o=this.openSlicers.find(o=>o.id===id); return (o&&o.mode)||'in'; },
+    setSlicerMode(id,mode){ const o=this.openSlicers.find(o=>o.id===id); if(o) o.mode=mode;
+      const f=this.slicerById(id).field; const r=this.filters.global.find(x=>x.field===f); if(r){ r.op=mode; this.reloadSection(); } },
+    isValueSelected(id,v){ const f=this.slicerById(id).field; const r=this.filters.global.find(x=>x.field===f); return r? r.values.includes(v):false; },
+    toggleSlicerValue(id,v){
+      const f=this.slicerById(id).field, mode=this.slicerMode(id);
+      let r=this.filters.global.find(x=>x.field===f);
+      if(!r){ r={field:f,op:mode,values:[]}; this.filters.global.push(r); } else { r.op=mode; }
+      r.values.includes(v)? r.values=r.values.filter(x=>x!==v) : r.values.push(v);
+      if(!r.values.length) this.filters.global=this.filters.global.filter(x=>x!==r);
+      this.reloadSection(); // slicer stays OPEN on pick (only × dismisses)
+    },
+    // flip an active global chip between include (=) and exclude (≠)
+    toggleChipOp(c){ const r=this.filters.global.find(x=>x.field===c.field); if(r){ r.op = r.op==='not_in'?'in':'not_in';
+      const o=this.openSlicers.find(o=>this.slicerById(o.id).field===c.field); if(o) o.mode=r.op; this.reloadSection(); } },
+    // Auto-pick the time-series bucket from the actual data span (replaces the manual D/W/M/Q toggle).
+    autoGrain(rows,field){
+      const f=field||'event_date';
+      const ds=(rows||[]).map(r=>r[f]).filter(Boolean).map(s=>String(s).slice(0,10));
+      if(ds.length<2) return 'D';
+      let lo=ds[0], hi=ds[0]; for(const d of ds){ if(d<lo)lo=d; if(d>hi)hi=d; }
+      const days=(new Date(hi)-new Date(lo))/86400000;
+      if(days<=45) return 'D';
+      if(days<=400) return 'M';
+      return 'Q';
+    },
+    // How many distinct time buckets a [from,to] range spans at grain g. Unbounded → Infinity.
+    // Walks days (ranges here are demo-sized) and caps the walk so a pathological range can't spin.
+    rangeBucketSpan(from,to,g){
+      if(!from||!to) return Infinity;
+      const end=String(to).slice(0,10); const seen=new Set(); let d=String(from).slice(0,10), guard=0;
+      while(d<=end && guard++<3700){ seen.add(dateBucketKey(d,g)); d=this._addDays(d,1); }
+      return seen.size||1;
+    },
+    // True when the active date filter spans a single bucket at grain g (so a breakdown at that grain
+    // would collapse to one point). hideDate / unbounded ranges never collapse.
+    _rangeCollapsesAt(g){ if(this.hideDate) return false; const {from,to}=this.resolveRange(); if(!from||!to) return false; return this.rangeBucketSpan(from,to,g)<=1; },
+    // A visual whose x-axis is a time bucket (the only kind the collapse rule can shrink to one point).
+    chartUsesTimeAxis(c){ return isTimeField(c&&c.dimension) && (c.type!=='scatter'); },
+    // Should THIS chart skip the filter? Only when it's a time breakdown AND the active range spans a
+    // single bucket at its natural grain (c.grain override, else autoGrain over its full default rows —
+    // measured unfiltered so the grain is stable). Categorical breakdowns & KPIs are never skipped.
+    chartCollapsedByFilter(sec,c){
+      if(!this.chartUsesTimeAxis(c)) return false;
+      if(this.hideDate) return false;
+      const {from,to}=this.resolveRange(); if(!from||!to) return false;
+      const g=c.grain||this.autoGrain(this.rowsForSection(sec,{range:this._defaultRange(sec)}), c.dimension);
+      return this._rangeCollapsesAt(g);
+    },
+    /* ── categorical filter skip: a filter on a visual's OWN breakdown dimension is skipped for that
+       visual when its selection spans a single category (applying it would collapse the visual to one
+       bar). Every OTHER filter — and the time filter — still applies. KPIs always get every filter. ── */
+    // Every active categorical filter across the three scopes (chips, drill, chat).
+    _activeCatFilters(){ return [...this.filters.global, ...this.filters.drill, ...this.filters.chat]; },
+    // Distinct categories a field takes across the source's full default set (the "as if unfiltered" universe).
+    _fieldUniverse(sec, field){
+      const s=new Set(); for(const r of this.rowsBySource((sec&&sec.source)||'primary')){ const v=r[field]; if(field in r && v!=null && v!=='') s.add(v); }
+      return s.size;
+    },
+    // How many of the dimension's categories a filter's SELECTION spans ('in' → count picked;
+    // 'not_in' → count remaining after exclusion). ≤1 means it would collapse a same-dimension visual.
+    _filterSpan(sec, r){ return r.op==='not_in' ? Math.max(0, this._fieldUniverse(sec, r.field) - r.values.length) : r.values.length; },
+    // Does categorical filter r collapse a breakdown on dimension `dim`? Only when it's on that same
+    // (categorical) dimension AND its selection spans exactly one category. Different dimension → never.
+    // DISABLED (v2.13.1): filters must ALWAYS apply — a filter on a chart's own breakdown dimension now
+    // narrows that chart too (it collapses to the selected bar(s), which is the correct filtered result).
+    // Silently skipping it made filters look broken ("I filtered by Platform and the platform chart
+    // didn't change"). Kept as a no-op so callers/pills that reference it still work.
+    _filterCollapsesDim(sec, dim, r){ return false; },
+    _filterCollapsesChart(sec, c, r){ return false; },
+    // No categorical filter is ever skipped now (see above), so nothing to report on the header.
+    _skippedCatFields(sec, c){ return []; },
+    /* ── time-axis context window (DEFAULT view only) ──
+       When the user has NOT set an explicit date filter, a time breakdown shows ~1 granularity level of
+       context so a trend isn't a lonely handful of points: daily → the full month (~30), weekly → ~3
+       months (~13), monthly → the full year (12), quarterly → ~8. As soon as the user picks a date range
+       (any preset other than the app default, or a custom range), the time chart RESPECTS that range like
+       every other visual — the filter always wins. The window ends at the active range's end (else the
+       data's as-of date) and walks back N-1 buckets. */
+    _timeBucketTarget(g){ return ({ D:31, W:13, M:12, Q:8 })[g] || 12; },   // ~10–15 buckets (daily = a month)
+    _grainForChart(sec, c){ return c.grain || this.autoGrain(this.rowsForSection(sec,{range:this._defaultRange(sec)}), c.dimension); },
+    // True only when the date filter is at the app default (no explicit user selection) — the one state
+    // in which time charts widen to their context window instead of honouring the active range.
+    _dateIsDefault(){
+      const def=(APP_CONFIG.dataSources.primary||{}).defaultPreset||'last_30d';
+      return this.range.preset===def && this.range.from==null && this.range.to==null;
+    },
+    // First day of the bucket that is `k` buckets before the bucket containing `end` (YYYY-MM-DD).
+    _subtractBuckets(end, g, k){
+      const d=new Date(String(end).slice(0,10)+'T00:00:00');
+      if(g==='M') return isoOf(new Date(d.getFullYear(), d.getMonth()-k, 1));
+      if(g==='Q'){ const q=Math.floor(d.getMonth()/3); return isoOf(new Date(d.getFullYear(), (q-k)*3, 1)); }
+      d.setDate(d.getDate()-(g==='W'?k*7:k)); return isoOf(d);   // D / W walk by days
+    },
+    // The [from,to] window a time chart renders over (N buckets of context ending at the range/as-of end).
+    _timeChartRange(sec, c){
+      const end=(this.resolveRange().to) || this._asOf || isoOf(new Date());
+      const g=this._grainForChart(sec, c);
+      return { from:this._subtractBuckets(end, g, this._timeBucketTarget(g)-1), to:end };
+    },
+    // Context applies only at the default date state (see _dateIsDefault). Drives the "+ context" pill.
+    chartShowsContext(sec, c){
+      return this.chartUsesTimeAxis(c) && !this.hideDate && this._dateIsDefault();
+    },
+    // Rows for one chart. A time-axis chart widens to its context window ONLY when the date filter is at
+    // the app default; once the user picks a date range it honours that range like every other visual.
+    // Non-time charts always use the active range. Every categorical filter now always applies.
+    rowsForChart(sec, c){
+      const range = this.chartShowsContext(sec,c) ? this._timeChartRange(sec,c) : null;   // null → active range
+      return this.rowsForSection(sec, { range });
+    },
+    setPreset(p){ this.range.preset=p; this.range.from=null; this.range.to=null; this.reloadSection(); },
+    setGrain(g){ this.granularity=g; this.range.preset=GRAIN_DEFAULT[g]||'last_30d'; this.range.from=null; this.range.to=null; this.reloadSection(); },
+    grainPresets(){ return GRAIN_PRESETS[this.granularity] || GRAIN_PRESETS.D; },
+    /* ── custom range: a click-through calendar (start day → end day → Apply) ── */
+    openCustomRange(){
+      if(!this.customRangeOpen){ const r=this.resolveRange(); this.customFrom=r.from||isoOf(new Date()); this.customTo=r.to||'';
+        const d=new Date(this.customFrom+'T00:00:00'); this.crY=d.getFullYear(); this.crM=d.getMonth(); }
+      this.customRangeOpen=!this.customRangeOpen; },
+    get crPicking(){ return (!this.customFrom || (this.customFrom && this.customTo)) ? 'start' : 'end'; },   // which field the next click fills
+    crLabel(iso){ try{ return new Date(iso+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }catch(e){ return iso; } },
+    crTitle(){ return new Date(this.crY,this.crM,1).toLocaleDateString('en-US',{month:'long',year:'numeric'}); },
+    crPrev(){ const d=new Date(this.crY,this.crM-1,1); this.crY=d.getFullYear(); this.crM=d.getMonth(); },
+    crNext(){ const d=new Date(this.crY,this.crM+1,1); this.crY=d.getFullYear(); this.crM=d.getMonth(); },
+    crGrid(){ const lead=new Date(this.crY,this.crM,1).getDay(); const dim=new Date(this.crY,this.crM+1,0).getDate();
+      const cells=[]; for(let i=0;i<lead;i++) cells.push({}); for(let d=1;d<=dim;d++) cells.push({day:d, iso:isoOf(new Date(this.crY,this.crM,d))}); return cells; },
+    crPick(iso){ if(!this.customFrom || (this.customFrom && this.customTo)){ this.customFrom=iso; this.customTo=''; }   // start a fresh range
+      else if(iso < this.customFrom){ this.customTo=this.customFrom; this.customFrom=iso; }                            // clicked before start → swap
+      else this.customTo=iso; },
+    crIsStart(iso){ return !!iso && iso===this.customFrom; },
+    crIsEnd(iso){ return !!iso && iso===this.customTo; },
+    crInRange(iso){ return !!iso && !!this.customFrom && !!this.customTo && iso>this.customFrom && iso<this.customTo; },
+    applyCustomRange(){ if(!this.customFrom || !this.customTo) return; this.range.preset='custom'; this.range.from=this.customFrom; this.range.to=this.customTo; this.customRangeOpen=false; this.reloadSection(); },
+    // Resolve the active selection to absolute {from,to} dates (YYYY-MM-DD). null = unbounded.
+    resolveRange(){ return this.resolvePreset(this.range.preset, this.range.from, this.range.to); },
+    // The range a breakdown falls back to when the active filter would collapse it to one bucket:
+    // the range the app opens on (source.defaultPreset), i.e. "as if no time filter were set".
+    _defaultRange(sec){
+      const ds=APP_CONFIG.dataSources[(sec&&sec.source)||'primary']||APP_CONFIG.dataSources.primary||{};
+      return this.resolvePreset(ds.defaultPreset||'all_time');
+    },
+    // Real-mode rows must cover BOTH the active filter and the default range, so a collapsed visual can
+    // fall back to its full range without a second query — load their union (widest bounds; null=open).
+    _loadRange(ds){
+      const a=this.resolveRange(), d=this.resolvePreset((ds&&ds.defaultPreset)||'all_time');
+      return { from:(!a.from||!d.from)?null:(a.from<d.from?a.from:d.from),
+               to:  (!a.to  ||!d.to )?null:(a.to  >d.to  ?a.to  :d.to  ) };
+    },
+    // Resolve ANY preset (+ optional custom from/to) to absolute {from,to}. null = unbounded.
+    resolvePreset(preset, cfrom, cto){
+      if(preset==='custom' && cfrom && cto) return {from:cfrom, to:cto};
+      // 2e — "current period" is anchored to the DATA's latest date (_asOf), not the wall clock.
+      // Warehouse snapshots lag real time, so a clock-anchored "this week"/"last 30d" would select a
+      // window the data doesn't cover (often zero rows) and mislabel WoW/MoM deltas. _asOf is null
+      // until the first load resolves it, then every preset resolves relative to it. (See _probeAsOf.)
+      const today = this._asOf ? new Date(this._asOf+'T00:00:00') : new Date();
+      const to=isoOf(today);
+      const dayStart   = n    => { const d=new Date(today); d.setDate(d.getDate()-n); return isoOf(d); };
+      const weekStart  = ()   => { const d=new Date(today); const dow=(d.getDay()+6)%7; d.setDate(d.getDate()-dow); return isoOf(d); };
+      const monthStart = back => isoOf(new Date(today.getFullYear(), today.getMonth()-back, 1));
+      const qtrStart   = back => { const q=Math.floor(today.getMonth()/3); return isoOf(new Date(today.getFullYear(), (q-back)*3, 1)); };
+      switch(preset){
+        case 'today':        return {from:to,             to};
+        case 'last_7d':      return {from:dayStart(6),    to};
+        case 'last_30d':     return {from:dayStart(29),   to};
+        case 'last_90d':     return {from:dayStart(89),   to};
+        case 'this_week':    return {from:weekStart(),    to};
+        case 'last_4w':      return {from:dayStart(7*4-1),  to};
+        case 'last_8w':      return {from:dayStart(7*8-1),  to};
+        case 'last_12w':     return {from:dayStart(7*12-1), to};
+        case 'this_month':   return {from:monthStart(0),  to};
+        case 'last_3m':      return {from:monthStart(2),  to};
+        case 'last_6m':      return {from:monthStart(5),  to};
+        case 'last_12m':     return {from:monthStart(11), to};
+        case 'this_quarter': return {from:qtrStart(0),    to};
+        case 'last_4q':      return {from:qtrStart(3),    to};
+        case 'last_8q':      return {from:qtrStart(7),    to};
+        case 'mtd':          return {from:monthStart(0),  to};
+        case 'ytd':          return {from:isoOf(new Date(today.getFullYear(),0,1)), to};
+        case 'all_time':     return {from:null, to:null};
+        default:             return {from:dayStart(89),   to};
+      }
+    },
+    presetLabel(p){ return ({
+      today:'Today', last_7d:'7 days', last_30d:'30 days', last_90d:'Last 90d',
+      this_week:'This week', last_4w:'Last 4w', last_8w:'Last 8w', last_12w:'Last 12w',
+      this_month:'This month', last_3m:'Last 3m', last_6m:'Last 6m', last_12m:'Last 12m',
+      this_quarter:'This quarter', last_4q:'Last 4q', last_8q:'Last 8q',
+      custom:'Custom', mtd:'MTD', ytd:'This year', all_time:'All time'
+    })[p]||p; },
+    rangeLabel(){ if(this.range.preset==='custom' && this.range.from && this.range.to) return `${this.range.from} → ${this.range.to}`; return this.presetLabel(this.range.preset); },
+    allChips(){
+      const out=[];
+      for(const r of this.filters.global) out.push({scope:'global',field:r.field,op:r.op,text:`${r.field} ${r.op==='not_in'?'≠':':'} ${r.values.join(', ')}`});
+      for(const r of this.filters.drill) out.push({scope:'drill',field:r.field,text:`${r.field}: ${r.values.join(', ')}`});
+      for(const r of this.filters.chat) out.push({scope:'chat',field:r.field,text:`${r.field}: ${r.values.join(', ')}`});
+      return out;
+    },
+    activeFilterCount(){ return this.filters.global.length+this.filters.drill.length+this.filters.chat.length; },
+    removeFilter(scope,field){ this.filters[scope]=this.filters[scope].filter(r=>r.field!==field); this.reloadSection(); },
+    clearAll(){ this.filters={global:[],drill:[],chat:[]}; this.drillHistory=[]; this.reloadSection(); },
+    resetAll(){ this.clearAll(); this.sectionFilters={}; this.range.preset=APP_CONFIG.dataSources.primary.defaultPreset; this.reloadSection(); },
+
+    /* ── per-column table filters (in the header) + sort + pagination ──
+       Every column carries its own sort toggle AND its own filter control:
+         • categorical (text/badge/status) → a checklist of that column's distinct values (multi-select);
+         • numeric (currency/number/integer/perunit/ratio/percent) → a min / max range.
+       Filters are stored per section+column in `sectionFilters[secId][colKey]` as a spec object
+       ({v:[...]} for values, {min,max} for a range) and applied client-side (no refetch). ── */
+    colFilterKind(col){
+      if(!col || !col.key || col.key==='creative') return null;
+      if(['currency','number','integer','perunit','ratio','percent'].includes(col.type)) return 'range';
+      if(['text','badge','status'].includes(col.type) || (col.key[0]==='_' && col.type!=='image')) return 'values';
+      return null;   // image / date → no per-column filter (dates use the global date picker)
+    },
+    colFilterable(col){ return !!this.colFilterKind(col); },
+    // Rows for this section's table WITH derived columns applied, but BEFORE column filters — so a filter's
+    // value list shows every option, and the value list survives selecting one.
+    _sectionRowsDerived(sec){
+      const rows=this.rowsForSection(sec);
+      const avgRoas=rows.reduce((a,b)=>a+(+b.roas||0),0)/Math.max(rows.length,1);
+      return rows.map(r=>{ const o={...r}; for(const d of (sec.table.derived||[])) o[d.name]=d.fn(r,{avgRoas}); return o; });
+    },
+    // Distinct values a categorical column takes (the checklist options).
+    colValues(sec,col){ return [...new Set(this._sectionRowsDerived(sec).map(r=>r[col.key]))]
+      .filter(v=>v!=null&&v!=='').map(String).sort((a,b)=>a.localeCompare(b,undefined,{numeric:true})); },
+    _colSpec(sec,col){ this.sectionFilters[sec.id]=this.sectionFilters[sec.id]||{}; const m=this.sectionFilters[sec.id];
+      if(!m[col.key]) m[col.key]= this.colFilterKind(col)==='range' ? {min:null,max:null} : {v:[]};
+      return m[col.key]; },
+    colValueSelected(sec,col,v){ const s=(this.sectionFilters[sec.id]||{})[col.key]; return !!(s&&s.v&&s.v.includes(String(v))); },
+    toggleColValue(sec,col,v){ const s=this._colSpec(sec,col); v=String(v); s.v.includes(v)? s.v=s.v.filter(x=>x!==v) : s.v.push(v); this.tablePage[sec.id]=0; },
+    // "Select all" toggle for a categorical column: true when every value is picked (an empty selection
+    // already means "no filter", so All-selected is offered as an explicit affordance and toggles to Clear).
+    colAllSelected(sec,col){ const vs=this.colValues(sec,col); const s=(this.sectionFilters[sec.id]||{})[col.key];
+      return vs.length>0 && !!(s&&s.v) && vs.every(v=>s.v.includes(String(v))); },
+    toggleColAll(sec,col){ const s=this._colSpec(sec,col); const vs=this.colValues(sec,col).map(String);
+      s.v = (vs.length && vs.every(v=>s.v.includes(v))) ? [] : vs.slice(); this.tablePage[sec.id]=0; },
+    colRange(sec,col){ const s=(this.sectionFilters[sec.id]||{})[col.key]; return (s&&'min'in s)?s:{min:null,max:null}; },
+    setColRange(sec,col,which,val){ const s=this._colSpec(sec,col); s[which]=(val===''||val==null)?null:+val; this.tablePage[sec.id]=0; },
+    colFilterActive(sec,col){ const s=(this.sectionFilters[sec.id]||{})[col.key]; if(!s) return false;
+      if('v'in s) return s.v.length>0; if('min'in s) return s.min!=null||s.max!=null; return false; },
+    clearColFilter(sec,col){ if(this.sectionFilters[sec.id]) delete this.sectionFilters[sec.id][col.key]; this.tablePage[sec.id]=0; },
+    tableFilterCount(sec){ const m=this.sectionFilters[sec.id]||{}; return (sec.table.columns||[]).filter(c=>this.colFilterActive(sec,c)).length; },
+    clearAllColFilters(sec){ this.sectionFilters[sec.id]={}; this.tablePage[sec.id]=0; },
+    // Apply every active per-column filter to a derived rowset.
+    _applyColFilters(rows, sec){
+      const sf=this.sectionFilters[sec.id]||{};
+      for(const key in sf){ const spec=sf[key]; if(!spec) continue;
+        if('v'in spec){ if(spec.v.length) rows=rows.filter(r=>spec.v.includes(String(r[key]))); }
+        else if('min'in spec){ if(spec.min!=null) rows=rows.filter(r=>(+r[key])>=spec.min);
+                               if(spec.max!=null) rows=rows.filter(r=>(+r[key])<=spec.max); }
+      }
+      return rows;
+    },
+    // All rows after column filters + derived columns + sort (grouped order when sectionGroupBy) — NOT paginated.
+    tableRowsAll(sec){
+      let rows=this._applyColFilters(this._sectionRowsDerived(sec), sec);
+      const ss=this.sortState[sec.id];
+      if(ss){ const dir=ss.dir==='asc'?1:-1; rows=[...rows].sort((a,b)=>{ let x=a[ss.key],y=b[ss.key];
+        if(x==null)x=''; if(y==null)y=''; const nx=+x,ny=+y;
+        if(x!==''&&y!==''&&!isNaN(nx)&&!isNaN(ny)) return (nx-ny)*dir;              // numeric compare
+        return String(x).localeCompare(String(y))*dir; }); }                        // else text compare
+      if(sec.table.sectionGroupBy) rows=[].concat(...this.tableGroups(sec,rows,sec.table.sectionGroupBy).map(g=>g.rows));
+      return rows;
+    },
+    tableRows(sec){ return this.tableRowsAll(sec); },                                // alias kept for count/empty-state callers
+    tableRowCount(sec){ return this.tableRowsAll(sec).length; },
+    tablePages(sec){ return Math.max(1, Math.ceil(this.tableRowCount(sec)/this.tablePageSize)); },
+    tablePageIndex(sec){ return Math.min(this.tablePage[sec.id]||0, this.tablePages(sec)-1); },
+    tableSetPage(sec,i){ this.tablePage[sec.id]=Math.max(0,Math.min(i,this.tablePages(sec)-1)); },
+    tableRangeLabel(sec){ const t=this.tableRowCount(sec); if(!t) return '0 of 0'; const p=this.tablePageIndex(sec);
+      return `${p*this.tablePageSize+1}–${Math.min(t,(p+1)*this.tablePageSize)} of ${t}`; },
+    sortBy(sid,key){ const s=this.sortState[sid]; this.sortState[sid]= s&&s.key===key? {key,dir:s.dir==='asc'?'desc':'asc'} : {key,dir:'desc'}; this.tablePage[sid]=0; },
+    /* ── generic "Copy view" — plain copy of exactly the columns/rows on screen (incl. the pooled totals
+       row), for any table that isn't a performance table. Writes rich HTML (formatted table for
+       Docs/Slack/email) + tab-separated text (columns for Sheets/Excel), same two-flavor contract as the
+       copysummary module. Performance tables get the richer copyPerfSummary() instead. ── */
+    _writeClipboard(html, tsv){
+      const done=()=>this.toast('Copied — paste into Docs/Slack/Sheets');
+      const fallback=()=>{ try{ const ta=document.createElement('textarea'); ta.value=tsv; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); done(); }catch(e){ this.toast('Copy failed'); } };
+      try{
+        if(navigator.clipboard && window.ClipboardItem){
+          const item=new ClipboardItem({ 'text/html':new Blob([html],{type:'text/html'}), 'text/plain':new Blob([tsv],{type:'text/plain'}) });
+          navigator.clipboard.write([item]).then(done, ()=>navigator.clipboard.writeText(tsv).then(done, fallback)); return;
+        }
+      }catch(e){}
+      if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(tsv).then(done, fallback); else fallback();
+    },
+    copyTableView(sec){
+      const rows=this.tableRowsAll(sec);
+      if(!rows.length){ this.toast('Nothing to copy — no rows in view'); return; }
+      const cols=(sec.table.columns||[]).filter(c=>c.type!=='image' && (c.label||c.key));
+      const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      const cellText=(c,r)=>{ const v=r[c.key]; if(v==null||v==='') return '—';
+        return ['currency','percent','ratio','perunit','number','integer','date'].includes(c.type) ? fmtCell(c.type,v) : String(v); };
+      const heads=cols.map(c=>c.label||this.pfLabel(c.key));
+      const tot=this.tableTotals(sec).cells;
+      const th=heads.map(h=>`<th style="text-align:left;border:1px solid #d0d5dd;padding:4px 8px;background:#f5f6fa">${esc(h)}</th>`).join('');
+      const body=rows.map(r=>'<tr>'+cols.map(c=>`<td style="border:1px solid #d0d5dd;padding:4px 8px">${esc(cellText(c,r))}</td>`).join('')+'</tr>').join('');
+      const totRow='<tr>'+cols.map(c=>`<td style="border:1px solid #d0d5dd;padding:4px 8px;font-weight:600;background:#fafbfc">${esc(tot[c.key]==null?'':tot[c.key])}</td>`).join('')+'</tr>';
+      const cap=`${esc(sec.tableTitle||sec.label||'View')} — ${esc(this.rangeLabel())} · ${rows.length} rows`;
+      const html=`<table style="border-collapse:collapse;font-family:sans-serif;font-size:13px"><caption style="text-align:left;font-weight:600;padding:4px 0">${cap}</caption><thead><tr>${th}</tr></thead><tbody>${body}${totRow}</tbody></table>`;
+      const clean=s=>String(s==null?'':s).replace(/\t/g,' ');
+      const tsv=[heads.join('\t'), ...rows.map(r=>cols.map(c=>clean(cellText(c,r))).join('\t')), cols.map(c=>clean(tot[c.key])).join('\t')].join('\n');
+      this._writeClipboard(html, tsv);
+    },
+    // Ellipsize a string to fit maxW px in the current ctx font.
+    _truncateToWidth(ctx,str,maxW){ str=String(str); if(ctx.measureText(str).width<=maxW) return str;
+      let s=str; while(s.length>1 && ctx.measureText(s+'…').width>maxW) s=s.slice(0,-1); return s+'…'; },
+    /* ── "Copy as image" — render the current table view to a PNG on the clipboard ──
+       Hand-drawn on a <canvas> (no external lib, no tainting): title + header + rows + pooled totals row,
+       numeric columns right-aligned, column widths measured from the text and capped. Written to the
+       clipboard as image/png; if the browser won't allow a clipboard image write, it downloads the PNG
+       instead so the user still gets it. */
+    copyTableImage(sec){
+      const rows=this.tableRowsAll(sec);
+      if(!rows.length){ this.toast('Nothing to copy — no rows in view'); return; }
+      const cols=(sec.table.columns||[]).filter(c=>c.type!=='image' && (c.label||c.key));
+      const heads=cols.map(c=>(c.label||this.pfLabel(c.key)).toUpperCase());
+      const tot=this.tableTotals(sec).cells;
+      const cellText=(c,r)=>{ const v=r[c.key]; if(v==null||v==='') return '—';
+        return ['currency','percent','ratio','perunit','number','integer','date'].includes(c.type) ? fmtCell(c.type,v) : String(v); };
+      const rightAlign=c=>['currency','percent','ratio','perunit','number','integer'].includes(c.type);
+      const matrix=rows.map(r=>cols.map(c=>cellText(c,r)));
+      const totRow=cols.map(c=>tot[c.key]==null?'':String(tot[c.key]));
+      const title=`${sec.tableTitle||sec.label||'View'} — ${this.rangeLabel()} · ${rows.length} rows`;
+      const FB='13px system-ui,-apple-system,"Segoe UI",sans-serif', FH='600 11px system-ui,-apple-system,"Segoe UI",sans-serif', FT='600 13px system-ui,-apple-system,"Segoe UI",sans-serif';
+      const pad=12, rowH=30, headH=34, titleH=36, MAXW=340, scale=2;
+      const meas=document.createElement('canvas').getContext('2d');
+      const colW=cols.map((c,i)=>{ meas.font=FH; let w=meas.measureText(heads[i]).width; meas.font=FB;
+        for(const row of matrix) w=Math.max(w, meas.measureText(row[i]).width); w=Math.max(w, meas.measureText(totRow[i]).width);
+        return Math.min(Math.ceil(w)+pad*2, MAXW); });
+      const tableW=colW.reduce((a,b)=>a+b,0);
+      const bodyTop=titleH+headH, H=bodyTop+matrix.length*rowH+rowH;   // title + header + body + totals
+      const cv=document.createElement('canvas'); cv.width=Math.ceil(tableW*scale); cv.height=Math.ceil(H*scale);
+      const ctx=cv.getContext('2d'); ctx.scale(scale,scale); ctx.textBaseline='middle';
+      ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,tableW,H);
+      // title
+      ctx.fillStyle='#1a2035'; ctx.font=FT; ctx.textAlign='left'; ctx.fillText(this._truncateToWidth(ctx,title,tableW-pad*2), pad, titleH/2);
+      // header band
+      ctx.fillStyle='#f5f6fa'; ctx.fillRect(0,titleH,tableW,headH);
+      ctx.fillStyle='#6b7694'; ctx.font=FH;
+      let x=0; cols.forEach((c,i)=>{ const ra=rightAlign(c); ctx.textAlign=ra?'right':'left';
+        ctx.fillText(this._truncateToWidth(ctx,heads[i],colW[i]-pad*2), ra?x+colW[i]-pad:x+pad, titleH+headH/2); x+=colW[i]; });
+      // body rows
+      ctx.font=FB;
+      matrix.forEach((row,ri)=>{ const y=bodyTop+ri*rowH;
+        if(ri%2){ ctx.fillStyle='#fafbfc'; ctx.fillRect(0,y,tableW,rowH); }
+        ctx.fillStyle='#1a2035'; x=0;
+        cols.forEach((c,i)=>{ const ra=rightAlign(c); ctx.textAlign=ra?'right':'left';
+          ctx.fillText(this._truncateToWidth(ctx,row[i],colW[i]-pad*2), ra?x+colW[i]-pad:x+pad, y+rowH/2); x+=colW[i]; });
+      });
+      // totals row
+      const ty=bodyTop+matrix.length*rowH;
+      ctx.fillStyle='#f0f2f5'; ctx.fillRect(0,ty,tableW,rowH);
+      ctx.fillStyle='#1a2035'; ctx.font=FT; x=0;
+      cols.forEach((c,i)=>{ const ra=rightAlign(c); ctx.textAlign=ra?'right':'left';
+        ctx.fillText(this._truncateToWidth(ctx,totRow[i],colW[i]-pad*2), ra?x+colW[i]-pad:x+pad, ty+rowH/2); x+=colW[i]; });
+      // gridlines: column separators + header underline + totals overline + outer border
+      ctx.strokeStyle='#e5e9ef'; ctx.lineWidth=1;
+      x=0; for(let i=0;i<cols.length-1;i++){ x+=colW[i]; ctx.beginPath(); ctx.moveTo(Math.round(x)+0.5,titleH); ctx.lineTo(Math.round(x)+0.5,H); ctx.stroke(); }
+      ctx.strokeStyle='#d0d5dd';
+      [titleH+headH, ty].forEach(gy=>{ ctx.beginPath(); ctx.moveTo(0,gy+0.5); ctx.lineTo(tableW,gy+0.5); ctx.stroke(); });
+      ctx.strokeRect(0.5,titleH+0.5,tableW-1,H-titleH-1);
+      // → clipboard (or download fallback)
+      cv.toBlob((blob)=>{
+        if(!blob){ this.toast('Could not render image'); return; }
+        const save=()=>{ const url=URL.createObjectURL(blob); const a=document.createElement('a');
+          a.href=url; a.download=(sec.tableTitle||sec.label||'table').replace(/\s+/g,'-').toLowerCase()+'.png'; a.click(); URL.revokeObjectURL(url);
+          this.toast('Saved table image (clipboard images not allowed here)'); };
+        try{
+          if(navigator.clipboard && window.ClipboardItem){
+            navigator.clipboard.write([new ClipboardItem({'image/png':blob})]).then(()=>this.toast('Copied as image — paste anywhere'), save);
+          } else save();
+        }catch(e){ save(); }
+      }, 'image/png');
+    },
+
+    /* ── grouped + expandable table model (both opt-in per section) ──
+       tableDisplay() flattens the visible rows into a single list of <tr> items the renderer
+       walks once: 'group' (a platform/section header, only when sec.table.sectionGroupBy is set),
+       'row' (a data row), and 'detail' (the expanded per-row breakdown, only emitted while a row
+       is open). With neither option set it returns one 'row' per visible row — identical output. */
+    colCount(sec){ return (sec.table.columns||[]).length + (sec.table.rowDetail?1:0); },
+    rowKey(sec,r){ return String(r.campaign_id ?? r.id ?? r.campaign_name ?? JSON.stringify(r).slice(0,48)); },
+    isRowExpanded(sec,r){ return !!this.expandedRows[sec.id+'|'+this.rowKey(sec,r)]; },
+    toggleRow(sec,r){ const k=sec.id+'|'+this.rowKey(sec,r); this.expandedRows={...this.expandedRows,[k]:!this.expandedRows[k]}; },
+    // Partition rows by a field, total spend per group, ordered by total spend descending.
+    tableGroups(sec,rows,field){
+      const m={};
+      for(const r of rows){ const k=(r[field]==null||r[field]==='')?'—':String(r[field]);
+        (m[k]=m[k]||{key:k,label:k,rows:[],spend:0}); m[k].rows.push(r); m[k].spend+=(+r.spend||0); }
+      return Object.values(m).sort((a,b)=>b.spend-a.spend);
+    },
+    // Totals row — sums only additive columns (currency/number/integer). Rates, ratios and per-unit costs
+    // are NEVER summed (a summed CTR/ROAS is meaningless), so they render '—'; the row is labelled in the
+    // first text-ish column. Totals reflect ALL filtered rows, not just the current page.
+    tableTotals(sec){
+      const rows=this.tableRowsAll(sec); const cells={}; let labelled=false;
+      const sum=f=>rows.reduce((a,r)=>a+(+r[f]||0),0);
+      for(const col of (sec.table.columns||[])){
+        if(['currency','number','integer'].includes(col.type)){ cells[col.key]=fmtCell(col.type, sum(col.key)); }
+        // 2b — a ratio/rate/per-unit total is the POOLED SUM(num)/SUM(den), never a column sum nor an
+        // average of per-row ratios. Only when the column names its num/den (e.g. roas → num:'revenue',
+        // den:'spend'); otherwise it stays '—', since those types genuinely can't be summed.
+        else if(['ratio','percent','perunit'].includes(col.type) && col.num && col.den){ const d=sum(col.den); cells[col.key]=fmtCell(col.type, d? sum(col.num)/d : 0); }
+        else if(!labelled && (!col.type || ['text','badge','status'].includes(col.type))){ cells[col.key]=`Total · ${rows.length.toLocaleString()} rows`; labelled=true; }
+        else cells[col.key]='—';
+      }
+      if(!labelled){ const c0=(sec.table.columns||[])[0]; if(c0) cells[c0.key]=`Total · ${rows.length.toLocaleString()}`; }
+      return { cells };
+    },
+    tableDisplay(sec){
+      // Show ALL rows (no pagination) — the container scrolls with a sticky header. A DOM safety cap
+      // (tableDisplayCap) renders the first N of an unusually large set so the tab never freezes; the
+      // footer notes it, and Copy always exports the full set regardless.
+      const groupBy=sec.table.sectionGroupBy, detail=!!sec.table.rowDetail;
+      const all=this.tableRowsAll(sec);
+      const shown = all.length>this.tableDisplayCap ? all.slice(0,this.tableDisplayCap) : all;
+      const items=[];
+      let gmeta=null;
+      if(groupBy){ gmeta={}; for(const g of this.tableGroups(sec,all,groupBy)) gmeta[g.key]={count:g.rows.length,spendLabel:fmt('currency',g.spend).label}; }
+      let lastGroup=null;
+      for(const r of shown){
+        if(groupBy){ const gv=(r[groupBy]==null||r[groupBy]==='')?'—':String(r[groupBy]);
+          if(gv!==lastGroup){ lastGroup=gv; const m=(gmeta&&gmeta[gv])||{count:0,spendLabel:''};
+            items.push({type:'group',label:gv,key:'g:'+gv,count:m.count,spendLabel:m.spendLabel}); } }
+        const k=this.rowKey(sec,r); items.push({type:'row',row:r,key:'r:'+k});
+        if(detail && this.isRowExpanded(sec,r)) items.push({type:'detail',row:r,key:'d:'+k});
+      }
+      if(all.length) items.push({type:'totals',key:'totals',cells:this.tableTotals(sec).cells});   // totals at the bottom
+      return items;
+    },
+    // Footer label: "All N rows" (or "First 1,000 of N — Copy exports all" when the DOM cap is hit).
+    tableShownLabel(sec){ const t=this.tableRowCount(sec);
+      if(t>this.tableDisplayCap) return `first ${this.tableDisplayCap.toLocaleString()} of ${t.toLocaleString()} rows — filter to narrow; Copy exports all`;
+      return `all ${t.toLocaleString()} row${t===1?'':'s'}`; },
+    // Columns for the per-day breakdown sub-table (rowDetail:'daily'). Date left, metrics right.
+    dailyColumns(){ return [
+      {key:'event_date',label:'Date',type:'date'},
+      {key:'spend',label:'Spend',type:'currency'},
+      {key:'impressions',label:'Impr.',type:'number'},
+      {key:'clicks',label:'Clicks',type:'number'},
+      {key:'ctr',label:'CTR',type:'percent'},
+      {key:'cpc',label:'CPC',type:'perunit'},
+      {key:'conversions',label:'Conv.',type:'number'},
+      {key:'cpa',label:'CPA',type:'perunit'},
+    ]; },
+    /* Per-day rows for ONE campaign — ONLY the days it was actually active within the current range.
+       The passed row is already prorated by rowsForSection(), so it carries _rangeFrom/_rangeTo (the
+       flight ∩ range window) and in-range totals. We list exactly those days and split the in-range
+       totals across them, so the breakdown sums to the row shown and never invents days the campaign
+       wasn't running. REAL mode: the build agent swaps the body for a getModelView query —
+       SELECT <dateCol>, SUM(spend)… FROM <prism> WHERE campaign_id = :id AND <range/filter WHERE>
+       GROUP BY <dateCol> ORDER BY <dateCol>. */
+    dailyRows(sec,row){
+      let from=row._rangeFrom, to=row._rangeTo;
+      if(!from || !to){                                     // point row (no flight) → fall back to the range window
+        const src=(sec&&sec.source)||'primary';
+        const dc=(APP_CONFIG.dataSources[src]||APP_CONFIG.dataSources.primary).dateCol||'event_date';
+        const rr=this.resolveRange(); from=rr.from; to=rr.to;
+        const dates=this.rowsBySource(src).map(r=>r[dc]).filter(Boolean).map(s=>String(s).slice(0,10)).sort();
+        const maxD=dates.length?dates[dates.length-1]:'2026-06-16';
+        to=to||maxD; if(!from) from=this._addDays(to,-13);
+      }
+      let cur=from; const all=[]; let guard=0;
+      while(cur<=to && guard++<400){ all.push(cur); cur=this._addDays(cur,1); }
+      const days = all.length>62 ? all.slice(all.length-62) : all;   // safety cap for an unusually long flight
+      if(!days.length) days.push(to);
+      const seed=(parseInt(String(row.campaign_id||row.campaign_name||'7').replace(/\D/g,''),10)||7);
+      const w=days.map((d,i)=>0.55+Math.abs(Math.sin(seed*0.37+i*1.31)));   // deterministic per-day weights
+      const wsum=w.reduce((a,b)=>a+b,0)||1;
+      return days.map((d,i)=>{
+        const f=w[i]/wsum;
+        const spend=(+row.spend||0)*f, impr=Math.round((+row.impressions||0)*f),
+              clicks=Math.round((+row.clicks||0)*f), conv=Math.round((+row.conversions||0)*f), rev=(+row.revenue||0)*f;
+        return { event_date:d, spend, impressions:impr, clicks, conversions:conv, revenue:rev,
+                 ctr: impr?clicks/impr:0, cpc: clicks?spend/clicks:null, cpa: conv?spend/conv:null, roas: spend?rev/spend:null };
+      });
+    },
+    renderCell(col,row){
+      const v=row[col.key];
+      // SECURITY: escape untrusted cell values (warehouse / 3rd-party ad-platform data) before rendering as HTML.
+      const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+      if(col.type==='image'){ if(!v) return ''; const src=/^(https?:|data:image\/)/i.test(String(v))?esc(v):''; return src?`<img src="${src}" class="w-12 h-8 object-cover rounded border border-[var(--border)]" loading="lazy">`:''; }
+      if(col.type==='status'){ const tone=v==='ACTIVE'?'positive':v==='PAUSED'?'warning':'neutral'; return `<span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[var(--${tone}-light)] text-[var(--${tone})]">${esc(v)}</span>`; }
+      if(col.type==='badge'){ let tone='primary',light='primary-light'; if(v==='Pause'){tone='negative';light='negative-light';} else if(v==='Scale'){tone='positive';light='positive-light';} return `<span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[var(--${light})] text-[var(--${tone})]">${esc(v)}</span>`; }
+      if(col.type==='text') return `<span class="font-medium">${v==null?'—':esc(v)}</span>`;
+      const title=col.type==='currency'?fmt('currency',v).exact:'';
+      return `<span class="tabular-nums" title="${esc(title)}">${fmtCell(col.type,v)}</span>`;
+    },
+
+    /* ── KPI/chart helpers ── */
+    kpiTooltip(k){ return k.tooltip || `${(k.agg||'').toUpperCase()}(${k.expr})`; },
+    deltaGood(k){ return (k._delta>=0)===!!k.favorableUp; },
+    // What the delta is measured against — so a green/red arrow never leaves the reader guessing
+    // "% of what, since when?". The comparison is always this range vs. the equal-length span before it.
+    comparePeriodPhrase(){
+      const p=this.range.preset;
+      return ({ today:'yesterday', last_7d:'the prior 7 days', last_30d:'the prior 30 days', last_90d:'the prior 90 days',
+        this_week:'last week', last_4w:'the prior 4 weeks', last_8w:'the prior 8 weeks', last_12w:'the prior 12 weeks',
+        this_month:'last month', last_3m:'the prior 3 months', last_6m:'the prior 6 months', last_12m:'the prior 12 months',
+        this_quarter:'last quarter', last_4q:'the prior 4 quarters', last_8q:'the prior 8 quarters',
+        mtd:'the same days last month', ytd:'the same period last year', this_year:'last year',
+        all_time:'the first half of the range', custom:'the equal-length period just before it'
+      })[p] || 'the previous period of the same length'; },
+    deltaTipText(k){ const dir=k._delta>=0?'up':'down'; return `${Math.abs(k._delta||0).toFixed(1)}% ${dir} vs. ${this.comparePeriodPhrase()}`; },
+    deltaTipHtml(k){
+      const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      const pct=Math.abs(k._delta||0).toFixed(1)+'%';
+      const word=k._delta>=0?'higher':'lower';
+      const good=this.deltaGood(k);
+      let h=`<b>${pct} ${word}</b> than ${esc(this.comparePeriodPhrase())}`;
+      h+=`<br>Selected range: <b>${esc(this.rangeLabel())}</b>, compared with the equal-length period immediately before it.`;
+      h+=`<br><span class="src">${good?'Green — moving the favorable way for this metric.':'Red — moving the unfavorable way for this metric.'}</span>`;
+      return h; },
+    chartSubtitle(c){ const a={sum:'Total',avg:'Average',distinct:'Distinct',ratio:'Pooled'}[c.agg]||''; let s=`${a} ${c.metric}${c.metricY?(' vs '+c.metricY):''} by ${c.dimension} · ${c.type}`;
+      if(c._unfiltered) s+=' · +context window';
+      (c._skippedFilters||[]).forEach(f=> s+=` · all ${f} (filter skipped)`);
+      return s; },
+
+    /* ── metric explainability (framework requirement) ──
+       Every KPI / chart series / table column explains itself on hover, immediately:
+       (a) what it is, (b) how it's calculated, (c) which source it comes from. */
+    metricTipHtml(label, how, source){
+      const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      let h=`<b>${esc(label)}</b>`;
+      if(how) h+=`<br>${esc(how)}`;
+      h += source ? `<br><span class="src">Source: ${esc(source)}</span>`
+                  : `<br><span class="src">Source: not specified — set <code>source</code> in APP_CONFIG.</span>`;
+      return h;
+    },
+    chartTip(c){ const a={sum:'Total',avg:'Average',distinct:'Distinct'}[c.agg]||''; return c.tooltip || `${a} ${c.metric}${c.metricY?(' vs '+c.metricY):''} by ${c.dimension}`.trim(); },
+    columnTip(col){ return col.tooltip || (({currency:'Currency value',percent:'Percentage rate',ratio:'Ratio / multiplier',perunit:'Per-unit cost',number:'Numeric value',date:'Date',status:'Status',badge:'Category',text:'Label',image:'Image'}[col.type]||'Value')+` · column "${col.key}"`); },
+    // The tooltip is the ONLY tooltip (no native title= on these elements → no double popup) and it is
+    // hoverable: leaving the trigger starts a short close timer that moving onto the tooltip cancels, so
+    // the user can travel to it and select/copy its text. tipEnter() keeps it open while hovered.
+    showTip(ev, html){ clearTimeout(this._tipTimer); this.tip.html=html; this.moveTip(ev); this.tip.show=true; },
+    moveTip(ev){ const pad=14, w=290, h=110; let x=ev.clientX+pad, y=ev.clientY+pad;
+      if(x+w>window.innerWidth) x=ev.clientX-w-pad; if(y+h>window.innerHeight) y=ev.clientY-h-pad;
+      this.tip.x=Math.max(8,x); this.tip.y=Math.max(8,y); },
+    tipEnter(){ clearTimeout(this._tipTimer); this.tip.show=true; },
+    hideTip(){ clearTimeout(this._tipTimer); this._tipTimer=setTimeout(()=>{ this.tip.show=false; }, 260); },
+
+    /* ── widgets ── */
+    /* ── widget builder: Title · Metric · Breakdown · Chart type · live preview ──
+       Metrics are the numeric fields in the section's data (+ a record count); dimensions are the
+       slicer fields (+ campaign). computeWidget() aggregates the live rows so the preview and the
+       placed card share one renderer (renderWidgetBody) and always match. */
+    widgetMetrics(){ const r=(this.rowsForSection()[0])||{};
+      const labels={spend:'Spend',revenue:'Revenue',conversions:'Conversions',clicks:'Clicks',impressions:'Impressions',sessions:'Sessions'};
+      const rate=['ctr','roas','cpa','cpc','flight_days']; // rates/ids aren't summable widget metrics
+      const nums=Object.keys(r).filter(k=>!k.startsWith('_')&&typeof r[k]==='number'&&!rate.includes(k));
+      const list=nums.map(k=>({key:k,label:labels[k]||k.replace(/_/g,' '),agg:'sum',format:(k==='spend'||k==='revenue')?'currency':'count'}));
+      list.push({key:'_count',label:'Records',agg:'count',format:'count'}); return list; },
+    widgetDims(){ const dims=this.slicers.filter(s=>s.field).map(s=>({key:s.field,label:s.label}));
+      if(!dims.some(d=>d.key==='campaign_name')) dims.push({key:'campaign_name',label:'Campaign'}); return dims; },
+    previewCfg(){ return {metric:this.wMetricKey,breakdown:this.wBreakdown,type:this.wType}; },
+    widgetAutoTitle(){ const m=this.widgetMetrics().find(x=>x.key===this.wMetricKey)||this.widgetMetrics()[0]||{label:'Metric'};
+      const d=this.widgetDims().find(x=>x.key===this.wBreakdown)||this.widgetDims()[0]||{label:''};
+      return (m.label||'Metric')+(this.wType==='single'?'':(this.wType==='line'?' over time':(' by '+(d.label||'')))); },
+    openWidgetBuilder(){ this.wMetricKey=this.wMetricKey||((this.widgetMetrics()[0]||{}).key||'_count');
+      this.wBreakdown=this.wBreakdown||((this.widgetDims()[0]||{}).key||''); this.wType=this.wType||'bar'; this.wTitle=''; this.widgetBuilderOpen=true; },
+    computeWidget(cfg){ cfg=cfg||{}; const rows=this.rowsForSection();
+      const m=this.widgetMetrics().find(x=>x.key===cfg.metric)||{key:'_count',agg:'count',format:'count'};
+      const val=r=> m.key==='_count'?1:(+r[m.key]||0);
+      if(cfg.type==='single'){ const total=rows.reduce((a,r)=>a+val(r),0); return {type:'single',format:m.format,total,series:[]}; }
+      if(cfg.type==='line'){ const sec=this.currentSection();
+        // same rule as section time charts: widen to the ~1-level context window only at the default date
+        // state; once a date filter is set, honour the active range. Bucketed at the chart's grain.
+        const tc={dimension:'event_date',type:'line'}; const g=this._grainForChart(sec,tc);
+        const range=this.chartShowsContext(sec,tc)?this._timeChartRange(sec,tc):null;
+        const src=this.rowsForSection(sec,{range, skipFilter:(r)=>this._filterCollapsesDim(sec,cfg.breakdown,r)});
+        const mm={}; for(const r of src){ const k=dateBucketKey(r.event_date,g); if(k==null) continue; mm[k]=(mm[k]||0)+val(r); }
+        const series=Object.keys(mm).sort().map(k=>({label:k,value:mm[k]})); return {type:'line',format:m.format,total:series.reduce((a,b)=>a+b.value,0),series}; }
+      const dim=cfg.breakdown||(this.widgetDims()[0]||{}).key||'platform';
+      // same categorical rule: a filter that narrows this widget's own breakdown to one category is skipped here.
+      const sec=this.currentSection();
+      const dimRows=this.rowsForSection(sec,{ skipFilter:(r)=>this._filterCollapsesDim(sec,dim,r) });
+      const mm={};
+      for(const r of dimRows){ const k=(r[dim]==null||r[dim]==='')?'—':String(r[dim]); mm[k]=(mm[k]||0)+val(r); }
+      const series=Object.keys(mm).map(k=>({label:k,value:mm[k]})).sort((a,b)=>b.value-a.value).slice(0,12);
+      return {type:cfg.type||'bar',format:m.format,total:series.reduce((a,b)=>a+b.value,0),series}; },
+    renderWidgetBody(cfg){ const d=this.computeWidget(cfg);
+      const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      if(d.type==='single') return `<div class="text-3xl font-bold tabular-nums">${fmt(d.format,d.total).label}</div>`;
+      if(!d.series.length) return `<div class="text-sm text-[var(--muted-foreground)] py-6 text-center">No data for the current filters.</div>`;
+      if(d.type==='line'){ const vs=d.series.map(s=>s.value), max=Math.max(...vs,1), min=Math.min(...vs,0), W=240,H=70;
+        const pts=vs.map((v,i)=>`${(vs.length<2?0:i/(vs.length-1))*W},${H-((v-min)/((max-min)||1))*H}`).join(' ');
+        return `<svg viewBox="0 0 ${W} ${H}" class="w-full h-[80px]" preserveAspectRatio="none"><polyline fill="none" stroke="var(--primary)" stroke-width="2" points="${pts}"/></svg>`
+          +`<div class="mt-1 flex justify-between text-[10px] text-[var(--muted-foreground)] tabular-nums"><span>${esc(d.series[0].label)}</span><span>${esc(d.series[d.series.length-1].label)}</span></div>`; }
+      const max=Math.max(...d.series.map(s=>s.value),1);
+      return `<div class="space-y-1">`+d.series.map(s=>`<div class="flex items-center gap-2 text-xs"><span class="w-24 truncate text-[var(--muted-foreground)]" title="${esc(s.label)}">${esc(s.label)}</span><span class="flex-1 h-3 rounded bg-[var(--surface-elevated)] overflow-hidden"><span class="block h-full rounded bg-[var(--primary)]" style="width:${Math.round(s.value/max*100)}%"></span></span><span class="tabular-nums w-16 text-right">${fmt(d.format,s.value).label}</span></div>`).join('')+`</div>`; },
+    addWidget(){ const m=this.wMetricKey||((this.widgetMetrics()[0]||{}).key||'_count');
+      const w={ id:'w'+Date.now(), title:this.wTitle||this.widgetAutoTitle(), metric:m, breakdown:this.wBreakdown||((this.widgetDims()[0]||{}).key||''), type:this.wType||'bar', widgetFilters:[] };
+      this.widgets.push(w); safeSet('widgets',this.widgets);
+      this.wTitle=''; this.widgetBuilderOpen=false; this.toast('Widget added'); },
+    removeWidget(id){ this.widgets=this.widgets.filter(w=>w.id!==id); safeSet('widgets',this.widgets); },
+
+    /* ── chat (4th scope) ── */
+    /* ── Asky chat — grounded in this project's Prism via the Asky agent ──
+       Same contract the Creative Studio uses: POST /<slug>/api/chat/start to open an investigation,
+       /chat/respond for follow-ups in the same thread, and short-poll /chat/poll for streamed items.
+       Requires the DEPLOYED app (Mode-2 cookie auth) + Real data; in Synthetic mode there's no backend
+       to reach, so we say so plainly rather than fake an answer. */
+    // New session: clear the in-app conversation + drop the Prism investigation so the next question opens
+    // a fresh thread. Reset without refreshing. Any in-flight poll is abandoned (chatPoll bails when the
+    // investigation id changes).
+    chatNewSession(){ this.chatInvestigationId=null; this.chatCursor=0; this.chatMessages=[]; this.chatStatus=''; this.chatProcessing=false; this.chatInput=''; },
+    async chatSend(text){
+      text=(text||'').trim(); if(!text || this.chatProcessing) return; this.chatInput='';
+      this.chatMessages.push({role:'user',text}); this.chatProcessing=true; this.chatStatus='Thinking…';
+      if(this.dataSource==='synthetic'){
+        this.chatProcessing=false; this.chatStatus='';
+        this.chatMessages.push({role:'assistant',text:"I'm in Synthetic (demo) mode, so I can't reach your data. On the deployed app, switch the header toggle to “Real data” and I'll answer grounded in this project's Prism."});
+        return;
+      }
+      try{
+        if(!this.chatInvestigationId){
+          // open an investigation/session on THIS project in Prism
+          const start=await fetch(apiBase()+'/chat/start',{ method:'POST', credentials:'include', headers:apiHeaders(), body:JSON.stringify({ workspaceId:wsId(), projectId:projId(), prompt:text }) }).then(r=>r.json());
+          this.chatInvestigationId = start && (start.investigationId||start.id||start.investigation_id||start.conversationId||start.sessionId);
+          this.chatCursor=0;
+          if(!this.chatInvestigationId) throw new Error((start&&(start.error||start.message))||'could not start the assistant');
+        } else {
+          // follow-up in the SAME investigation (keeps conversation context). /chat/respond wants
+          // `message` (NOT `prompt` like /chat/start) — sending `prompt` fails with "message is required",
+          // which is why follow-ups hung. Send both, surface errors, and adopt any id/cursor it returns.
+          const resp=await fetch(apiBase()+'/chat/respond',{ method:'POST', credentials:'include', headers:apiHeaders(), body:JSON.stringify({ investigationId:this.chatInvestigationId, workspaceId:wsId(), message:text, prompt:text }) }).then(r=>r.json()).catch(()=>null);
+          if(resp){ if(resp.investigationId) this.chatInvestigationId=resp.investigationId; if(resp.cursor!=null) this.chatCursor=resp.cursor; if(resp.ok===false) throw new Error(resp.error||resp.message||'could not continue the chat'); }
+        }
+        await this.chatPoll();
+      }catch(e){ this.chatMessages.push({role:'assistant',text:'Sorry — I couldn’t reach the assistant ('+((e&&e.message)||'error')+'). The chat runs on the deployed app (cookie sign-in) against a live Prism project.'}); }
+      finally{ this.chatProcessing=false; this.chatStatus=''; }
+    },
+    // Short-poll the investigation. Robust on purpose: progress lines collapse to ONE live status line
+    // (chatStatus), the answer accumulates into a single bubble, and we STOP as soon as the run is
+    // terminal / an answer arrives / a wall-clock cap is hit — so it can never spin forever even if the
+    // backend labels completion with a field we didn't anticipate.
+    async chatPoll(){
+      let answer='', appended=false, produced=false; const t0=Date.now(), BUDGET=180000;   // wall-clock budget, not an iteration count
+      const myInv=this.chatInvestigationId;     // abandon this poll if a New chat / new question replaces the session
+      const nap=ms=>new Promise(r=>setTimeout(r,ms));
+      const pick=o=>(o&&(o.text||o.content||o.message||o.answer||o.markdown||o.body))||'';
+      const ANS=/final|answer|assistant|result|^message$|^text$/;            // kinds that are the ANSWER, not progress
+      for(let i=0;i<300;i++){
+        if(Date.now()-t0>BUDGET) break;
+        if(this.chatInvestigationId!==myInv) return;   // New chat / new question started → drop this poll
+        let r=null;
+        try{ r=await fetch(apiBase()+'/chat/poll',{ method:'POST', credentials:'include', headers:apiHeaders(), body:JSON.stringify({ investigationId:this.chatInvestigationId, workspaceId:wsId(), cursor:this.chatCursor||0, waitMs:8000 }) }).then(x=>x.json()); }
+        catch(e){ await nap(2000); continue; }
+        if(r && r.cursor!=null) this.chatCursor=r.cursor;
+        const items=(r&&(r.items||r.messages||r.events||r.updates))||[]; let gotNew=false;
+        for(const it of items){
+          const txt=pick(it); if(!txt) continue;
+          const k=String(it.kind||it.type||it.role||it.status||'').toLowerCase();
+          const isProgress = !ANS.test(k) && (k==='processing_message' || /process|progress|status|thinking|tool|step/.test(k));
+          if(isProgress){ this.chatStatus=txt; gotNew=true; }                 // latest status only → no repeats
+          else if(answer.indexOf(txt)===-1){ answer += (answer?'\n\n':'')+txt; gotNew=true; }   // accumulate the answer (dedup)
+        }
+        // some backends deliver the final answer as a TOP-LEVEL field rather than inside items
+        const top=(r&&(r.answer||r.result||r.response||r.finalMessage||(typeof r.message==='string'?r.message:'')))||'';
+        if(top && answer.indexOf(top)===-1){ answer += (answer?'\n\n':'')+top; gotNew=true; }
+        if(gotNew) produced=true;       // THIS turn has started producing items (backend returns only items after our cursor)
+        if(answer){ if(!appended){ this.chatMessages.push({role:'assistant',text:answer}); appended=true; } else { this.chatMessages[this.chatMessages.length-1].text=answer; } }
+        const st=String((r&&(r.status||r.state))||'').toLowerCase();
+        const terminal = r && (r.done===true||r.terminal===true||r.finished===true||r.complete===true||r.completed===true || /complet|done|finish|fail|error|cancel|await|ready/.test(st));
+        // On a follow-up the first polls can still echo the PRIOR turn's 'completed'; only stop once THIS
+        // turn has actually produced something, so we don't bail before the new answer arrives.
+        if(terminal && produced) break;
+        if(!gotNew) await nap(2000);    // server returned fast/empty → wait before re-polling (never busy-loop)
+      }
+      if(!appended) this.chatMessages.push({role:'assistant',text:'The assistant didn’t return an answer in time — it may still have completed in Prism. Try again in a moment.'});
+    },
+
+    /* ── toast ── */
+    toast(text,kind){ const id=++this._tid; this.toasts.push({id,text,kind}); setTimeout(()=>{ this.toasts=this.toasts.filter(t=>t.id!==id); },3000); },
+  };
+}
+</script>
+</body>
+</html>
