@@ -1588,11 +1588,15 @@ function app(){
       return cl.length? ' WHERE '+cl.join(' AND ') : '';
     },
     // Does the already-fetched window `loaded` fully contain the window `need`? null bound = unbounded.
+    // EXACT match, not "superset contains": a source whose loadSource() pre-aggregates in SQL
+    // (SUM/GROUP BY over the date WHERE) returns rows that are totals for the fetched window and carry
+    // no per-row date, so client-side date filtering can't narrow a wider cached window to a smaller
+    // selection — the numbers can only change by re-running the query. So ANY change to the date window
+    // (widen OR narrow) must refetch. Categorical filter toggles never touch the date window, so they
+    // still hit the cache and stay instant.
     _rangeCovers(loaded, need){
       if(!loaded) return false;
-      const coversFrom = loaded.from==null || (need.from!=null && loaded.from<=need.from);
-      const coversTo   = loaded.to==null   || (need.to!=null   && loaded.to>=need.to);
-      return coversFrom && coversTo;
+      return loaded.from===need.from && loaded.to===need.to;
     },
     async loadData(){
       // GENERIC MULTI-SOURCE LOADER — loads EVERY entry in APP_CONFIG.dataSources, both Prism tables
@@ -2696,8 +2700,13 @@ function app(){
     // fall back to its full range without a second query — load their union (widest bounds; null=open).
     _loadRange(ds){
       const a=this.resolveRange(), d=this.resolvePreset((ds&&ds.defaultPreset)||'all_time');
-      return { from:(!a.from||!d.from)?null:(a.from<d.from?a.from:d.from),
-               to:  (!a.to  ||!d.to )?null:(a.to  >d.to  ?a.to  :d.to  ) };
+      // Fetch window = the ACTIVE selected range, widened only to also cover a BOUNDED default range.
+      // A bounded active range MUST still reach the query even when the default is 'all_time'; the old
+      // code unioned with the default and, all_time being unbounded, collapsed EVERY selection to
+      // {null,null} so the query never filtered by date. active all_time ⇒ unbounded; active bounded ⇒
+      // bounded query (and re-aggregated numbers that actually track the picker).
+      return { from:(a.from==null)?null:(d.from!=null && d.from<a.from ? d.from : a.from),
+               to:  (a.to==null)  ?null:(d.to!=null   && d.to  >a.to   ? d.to   : a.to) };
     },
     // Resolve ANY preset (+ optional custom from/to) to absolute {from,to}. null = unbounded.
     resolvePreset(preset, cfrom, cto){
