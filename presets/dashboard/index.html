@@ -157,48 +157,61 @@
           <button @click="setPreset(p)" class="px-3 py-1.5 text-xs font-medium border-l first:border-l-0 border-[var(--border)]"
             :class="range.preset===p ? 'bg-[var(--primary)] text-white' : 'text-[var(--foreground)] hover:bg-[var(--surface)]'" x-text="presetLabel(p)"></button>
         </template>
-        <button @click="openCustomRange()" title="Pick an exact date range" class="px-3 py-1.5 text-xs font-medium border-l border-[var(--border)] flex items-center gap-1.5"
+        <button @click="openCustomRange()" title="Pick an exact date range or another preset" class="px-3 py-1.5 text-xs font-medium border-l border-[var(--border)] flex items-center gap-1.5 whitespace-nowrap"
           :class="range.preset==='custom' ? 'bg-[var(--primary)] text-white' : 'text-[var(--foreground)] hover:bg-[var(--surface)]'">
-          <span x-html="icon('calendar')"></span><span x-text="range.preset==='custom' ? rangeLabel() : 'Custom'"></span>
+          <span x-html="icon('calendar')"></span><span x-text="rangeDatesLabel()"></span>
         </button>
       </div>
       <!-- Visual calendar range picker: click a start day then an end day (the range highlights),
            then Apply. Start/End fields show the current selection; the active one is outlined. -->
-      <div x-show="customRangeOpen" x-cloak @click.outside="customRangeOpen=false" x-transition class="absolute left-0 top-full mt-1.5 z-40 w-72 p-3 rounded-xl bg-[var(--surface-elevated)] border border-[var(--border)] shadow-lg">
-        <div class="flex items-stretch gap-2 mb-3">
-          <div class="flex-1 px-2.5 py-1.5 rounded-lg border" :class="crPicking==='start' ? 'border-[var(--primary)] ring-1 ring-[var(--primary)]' : 'border-[var(--border)]'">
-            <div class="text-[9px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">Start date</div>
-            <div class="text-sm tabular-nums" x-text="customFrom ? crLabel(customFrom) : '—'"></div>
+      <div x-show="customRangeOpen" x-cloak @click.outside="customRangeOpen=false" x-transition class="absolute left-0 top-full mt-1.5 z-40 w-[452px] rounded-xl bg-[var(--surface-elevated)] border border-[var(--border)] shadow-lg overflow-hidden">
+        <div class="flex items-stretch">
+          <!-- LEFT column: quick presets (full list), stacked beside the calendar -->
+          <div class="w-[132px] shrink-0 border-r border-[var(--border-subtle)] bg-[var(--surface)]/40 p-2 flex flex-col gap-0.5 max-h-[392px] overflow-auto">
+            <template x-for="p in ['today','last_7d','last_30d','last_90d','this_week','last_week','this_month','last_month','this_quarter','ytd','last_year','all_time']" :key="p">
+              <button @click="setPreset(p); customRangeOpen=false" class="w-full text-left px-2.5 py-1.5 rounded-lg text-xs"
+                :class="range.preset===p ? 'bg-[var(--primary-light)] text-[var(--primary)] font-semibold' : 'text-[var(--foreground)] hover:bg-[var(--surface)]'" x-text="presetLabel(p)"></button>
+            </template>
           </div>
-          <div class="flex items-center text-[var(--muted-foreground)]">–</div>
-          <div class="flex-1 px-2.5 py-1.5 rounded-lg border" :class="crPicking==='end' ? 'border-[var(--primary)] ring-1 ring-[var(--primary)]' : 'border-[var(--border)]'">
-            <div class="text-[9px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">End date</div>
-            <div class="text-sm tabular-nums" x-text="customTo ? crLabel(customTo) : '—'"></div>
-          </div>
-        </div>
-        <div class="flex items-center justify-between mb-1">
-          <button @click="crPrev()" class="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--muted-foreground)] hover:bg-[var(--surface)] hover:text-[var(--foreground)]"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
-          <span class="text-sm font-semibold" x-text="crTitle()"></span>
-          <button @click="crNext()" class="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--muted-foreground)] hover:bg-[var(--surface)] hover:text-[var(--foreground)]"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></button>
-        </div>
-        <div class="grid grid-cols-7 text-center text-[10px] font-medium text-[var(--muted-foreground)] mb-1">
-          <template x-for="(d,i) in ['S','M','T','W','T','F','S']" :key="i"><span x-text="d"></span></template>
-        </div>
-        <div class="grid grid-cols-7 gap-y-0.5 text-center">
-          <template x-for="(cell,i) in crGrid()" :key="i">
-            <div class="py-0.5 flex items-center justify-center" :class="crInRange(cell.iso) ? 'bg-[var(--primary-light)]' : ''">
-              <template x-if="cell.iso">
-                <button @click="crPick(cell.iso)"
-                  class="w-8 h-8 rounded-full text-xs tabular-nums flex items-center justify-center transition-colors"
-                  :class="(crIsStart(cell.iso)||crIsEnd(cell.iso)) ? 'bg-[var(--primary)] text-white font-semibold' : (crInRange(cell.iso) ? 'text-[var(--primary)]' : 'hover:bg-[var(--surface)]')"
-                  x-text="cell.day"></button>
+          <!-- RIGHT column: exact-date calendar -->
+          <div class="flex-1 p-3">
+            <div class="text-[9px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)] mb-1.5">Pick exact dates</div>
+            <div class="flex items-stretch gap-2 mb-3">
+              <div class="flex-1 px-2.5 py-1.5 rounded-lg border" :class="crPicking==='start' ? 'border-[var(--primary)] ring-1 ring-[var(--primary)]' : 'border-[var(--border)]'">
+                <div class="text-[9px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">Start date</div>
+                <div class="text-sm tabular-nums" x-text="customFrom ? crLabel(customFrom) : '—'"></div>
+              </div>
+              <div class="flex items-center text-[var(--muted-foreground)]">–</div>
+              <div class="flex-1 px-2.5 py-1.5 rounded-lg border" :class="crPicking==='end' ? 'border-[var(--primary)] ring-1 ring-[var(--primary)]' : 'border-[var(--border)]'">
+                <div class="text-[9px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">End date</div>
+                <div class="text-sm tabular-nums" x-text="customTo ? crLabel(customTo) : '—'"></div>
+              </div>
+            </div>
+            <div class="flex items-center justify-between mb-1">
+              <button @click="crPrev()" class="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--muted-foreground)] hover:bg-[var(--surface)] hover:text-[var(--foreground)]"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
+              <span class="text-sm font-semibold" x-text="crTitle()"></span>
+              <button @click="crNext()" class="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--muted-foreground)] hover:bg-[var(--surface)] hover:text-[var(--foreground)]"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></button>
+            </div>
+            <div class="grid grid-cols-7 text-center text-[10px] font-medium text-[var(--muted-foreground)] mb-1">
+              <template x-for="(d,i) in ['S','M','T','W','T','F','S']" :key="i"><span x-text="d"></span></template>
+            </div>
+            <div class="grid grid-cols-7 gap-y-0.5 text-center">
+              <template x-for="(cell,i) in crGrid()" :key="i">
+                <div class="py-0.5 flex items-center justify-center" :class="crInRange(cell.iso) ? 'bg-[var(--primary-light)]' : ''">
+                  <template x-if="cell.iso">
+                    <button @click="crPick(cell.iso)"
+                      class="w-8 h-8 rounded-full text-xs tabular-nums flex items-center justify-center transition-colors"
+                      :class="(crIsStart(cell.iso)||crIsEnd(cell.iso)) ? 'bg-[var(--primary)] text-white font-semibold' : (crInRange(cell.iso) ? 'text-[var(--primary)]' : 'hover:bg-[var(--surface)]')"
+                      x-text="cell.day"></button>
+                  </template>
+                </div>
               </template>
             </div>
-          </template>
-        </div>
-        <div class="flex items-center justify-end gap-1 mt-3 pt-2 border-t border-[var(--border-subtle)]">
-          <button @click="customRangeOpen=false" class="px-3 py-1.5 text-xs font-medium rounded-lg text-[var(--muted-foreground)] hover:bg-[var(--surface)]">Cancel</button>
-          <button @click="applyCustomRange()" :disabled="!customFrom||!customTo" class="px-3 py-1.5 text-xs font-semibold rounded-lg text-[var(--primary)] hover:bg-[var(--primary-light)] disabled:opacity-40 disabled:cursor-not-allowed">Apply</button>
+            <div class="flex items-center justify-end gap-1 mt-3 pt-2 border-t border-[var(--border-subtle)]">
+              <button @click="customRangeOpen=false" class="px-3 py-1.5 text-xs font-medium rounded-lg text-[var(--muted-foreground)] hover:bg-[var(--surface)]">Cancel</button>
+              <button @click="applyCustomRange()" :disabled="!customFrom||!customTo" class="px-3 py-1.5 text-xs font-semibold rounded-lg text-[var(--primary)] hover:bg-[var(--primary-light)] disabled:opacity-40 disabled:cursor-not-allowed">Apply</button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -250,15 +263,18 @@
               <span class="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)]" x-text="k.label"></span>
               <button class="w-6 h-6 rounded flex items-center justify-center text-[var(--muted-foreground)] hover:bg-[var(--surface)] hover:text-[var(--primary)]" @mouseenter="showTip($event, metricTipHtml(k.label, kpiTooltip(k), k.source))" @mousemove="moveTip($event)" @mouseleave="hideTip()" x-html="icon('info')"></button>
             </div>
-            <div class="flex items-end gap-2">
-              <span class="text-2xl font-bold tabular-nums cursor-help" @mouseenter="k._exact && showTip($event, metricTipHtml(k.label, 'Exact: '+k._exact, k.source))" @mousemove="moveTip($event)" @mouseleave="hideTip()" x-text="k._val ?? '—'"></span>
+            <!-- per-KPI error: shown only in this card when THIS metric failed (not the whole app) -->
+            <div x-show="k._err" class="flex items-center gap-1.5 text-xs text-[var(--negative)] py-1">
+              <span x-html="icon('warning')"></span><span>Couldn't load this metric.</span>
+            </div>
+            <div x-show="!k._err" class="flex items-end gap-2">
+              <span class="text-2xl font-bold tabular-nums" x-text="k._val ?? '—'"></span>
               <span x-show="k._delta!=null" class="flex items-center gap-0.5 text-xs font-semibold mb-1 tabular-nums cursor-help"
                     :class="deltaGood(k) ? 'text-[var(--positive)]' : 'text-[var(--negative)]'"
                     @mouseenter="showTip($event, deltaTipHtml(k))" @mousemove="moveTip($event)" @mouseleave="hideTip()">
                 <span x-html="(k._delta>=0)?icon('arrowup'):icon('arrowdown')"></span><span x-text="Math.abs(k._delta||0).toFixed(1)+'%'"></span>
               </span>
             </div>
-            <div class="h-9 -mx-1" :id="`spark-${sec.id}-${ki}`"></div>
           </div>
         </template>
       </div>
@@ -697,8 +713,6 @@
                 <div>
                   <h3 class="text-sm font-semibold flex items-center gap-2">
                     <span x-text="c.title"></span>
-                    <span x-show="c._unfiltered" @mouseenter="showTip($event, 'Time charts show about one granularity level of context around the selected range — a day breakdown spans the month, a week breakdown ~3 months, a month breakdown the full year — so the trend is never just a point or two. Every other filter still applies.')" @mousemove="moveTip($event)" @mouseleave="hideTip()"
-                      class="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-[var(--primary-light)] text-[var(--primary)] cursor-help whitespace-nowrap">+ context</span>
                     <template x-for="f in (c._skippedFilters||[])" :key="f">
                       <span @mouseenter="showTip($event, 'The '+f+' filter selects a single '+f+' — applying it here would collapse this breakdown to one bar. Showing all '+f+' values instead; the time filter and every other filter still apply.')" @mousemove="moveTip($event)" @mouseleave="hideTip()"
                         class="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-[var(--primary-light)] text-[var(--primary)] cursor-help whitespace-nowrap" x-text="'all '+pfLabel(f).toLowerCase().replace(/s?$/,'s')"></span>
@@ -708,9 +722,13 @@
                 </div>
                 <button class="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--muted-foreground)] hover:bg-[var(--surface)] hover:text-[var(--primary)]" @mouseenter="showTip($event, metricTipHtml(c.title, chartTip(c), c.source))" @mousemove="moveTip($event)" @mouseleave="hideTip()" x-html="icon('info')"></button>
               </div>
-              <div :id="`chart-${sec.id}-${ci}`" :style="`height:${ci===0 && sec.layout!=='breakdown-grid' ? 340 : 260}px`"></div>
+              <div x-show="!c._err" :id="`chart-${sec.id}-${ci}`" :style="`height:${ci===0 && sec.layout!=='breakdown-grid' ? 340 : 260}px`"></div>
+              <!-- per-chart error: shown only in THIS chart when it failed (not the whole app) -->
+              <div x-show="c._err" class="flex items-center justify-center gap-1.5 py-10 text-sm text-[var(--negative)]">
+                <span x-html="icon('warning')"></span><span>Couldn't load this chart.</span>
+              </div>
               <!-- empty state -->
-              <div x-show="(c._data||[]).length===0 && !loading" class="text-center py-8 text-sm text-[var(--muted-foreground)]">No results match the selected filters.</div>
+              <div x-show="!c._err && (c._data||[]).length===0 && !loading" class="text-center py-8 text-sm text-[var(--muted-foreground)]">No results match the selected filters.</div>
             </section>
           </template>
         </div>
@@ -1584,10 +1602,10 @@ const APP_CONFIG = {
       id:'overview', label:'Overview', icon:'grid', layout:'kpi-grid', source:'primary',
       subtitle:'Spend and return across all platforms, broken down by platform, device, and day.',
       kpis:[
-        { label:'Total Spend', agg:'sum', expr:'spend',   format:'currency', favorableUp:false, source:'Ad platforms', tooltip:'SUM(spend) across ad-platform rows over the filtered set.' },
-        { label:'Revenue',     agg:'sum', expr:'revenue', format:'currency', favorableUp:true,  source:'Ad platforms', tooltip:'SUM(revenue / conversion value) over the filtered set.' },
-        { label:'ROAS', agg:'ratio', num:'revenue', den:'spend',       format:'ratio',   favorableUp:true, source:'Ad platforms', tooltip:'SUM(revenue) ÷ SUM(spend) over the filtered set — pooled, not an average of per-row ratios.' },
-        { label:'CTR',  agg:'ratio', num:'clicks',  den:'impressions', format:'percent', favorableUp:true, source:'Ad platforms', tooltip:'SUM(clicks) ÷ SUM(impressions) over the filtered set — pooled, not an average of per-row rates.' },
+        { label:'Total Spend', agg:'sum', expr:'spend',   format:'currency', favorableUp:false, source:'Ad platforms', tooltip:'SUM(spend) — total ad money spent in the selected range.' },
+        { label:'Revenue',     agg:'sum', expr:'revenue', format:'currency', favorableUp:true,  source:'Ad platforms', tooltip:'SUM(revenue) — total sales value attributed to these campaigns.' },
+        { label:'ROAS', agg:'ratio', num:'revenue', den:'spend',       format:'ratio',   favorableUp:true, source:'Ad platforms', tooltip:'Revenue ÷ spend — dollars earned per dollar spent (e.g. 4× = $4 back per $1). Higher is better.' },
+        { label:'CTR',  agg:'ratio', num:'clicks',  den:'impressions', format:'percent', favorableUp:true, source:'Ad platforms', tooltip:'Clicks ÷ impressions — the share of impressions that led to a click.' },
       ],
       charts:[
         { title:'Spend over time', metric:'spend', agg:'sum', dimension:'event_date', type:'area',  sort:'asc',  palette:1, source:'Ad platforms', tooltip:'Daily SUM(spend) across ad platforms.' },
@@ -2682,14 +2700,8 @@ function app(){
 
         /* ── chart rendering + peek-popover drill ── */
     renderSection(sec){
-      (sec.kpis||[]).forEach((k,ki)=>{
-        const el=document.getElementById(`spark-${sec.id}-${ki}`); if(!el) return;
-        const inst=echarts.getInstanceByDom(el)||echarts.init(el,null,{renderer:'svg'});
-        const data=Array.from({length:12},(_,i)=>50+Math.sin(i+ki)*20+i);
-        inst.setOption({grid:{left:0,right:0,top:2,bottom:0},xAxis:{type:'category',show:false},yAxis:{type:'value',show:false},tooltip:{show:false},
-          series:[{type:'line',data,smooth:.3,symbol:'none',lineStyle:{width:2,color:chartColor(k.favorableUp?2:1)},areaStyle:{color:chartColor(k.favorableUp?2:1),opacity:.1}}]});
-        inst.resize(); // re-fit: container may have been hidden/narrow at init time
-      });
+      // (KPI sparklines removed — they plotted a synthetic sine wave, not real data, so they were
+      //  decorative noise. KPI cards now show the value + real period-over-period delta only.)
       (sec.charts||[]).forEach((c,ci)=>{
         const el=document.getElementById(`chart-${sec.id}-${ci}`); if(!el) return;
         const inst=echarts.getInstanceByDom(el)||echarts.init(el,null,{renderer:'svg'});
@@ -2794,9 +2806,10 @@ function app(){
             label:{show:true,formatter:p=>`${p.name}\n${formatAbbrev(p.value)}`,fontSize:11,color:'#fff'},
             data:data.map((d,i)=>({name:d.label,value:d.value,itemStyle:{color:chartColor((i%6)+1)}}))}]};
       }
-      // bar / rankedBar (horizontal, strongest→softest top-to-bottom shading)
+      // bar / rankedBar — a categorical breakdown, so each category gets its OWN colour (like the donut),
+      // instead of one flat colour for the whole series. Cycles the 6-colour chart palette.
       const horiz = c.type==='rankedBar';
-      const cats=data.map(d=>d.label), vals=data.map((d,i)=>({value:d.value, itemStyle:{color:chartColor(c.palette), opacity: horiz? Math.max(1-(i*0.12),0.4):1, borderRadius: horiz?[0,4,4,0]:[4,4,0,0]}}));
+      const cats=data.map(d=>d.label), vals=data.map((d,i)=>({value:d.value, itemStyle:{color:chartColor((i%6)+1), borderRadius: horiz?[0,4,4,0]:[4,4,0,0]}}));
       return {...base,
         xAxis: horiz? valAxis(this.pfLabel(c.metric),'x') : catAxis(cats, this.pfLabel(c.dimension), 'x', c.dimension),
         yAxis: horiz? catAxis(cats, this.pfLabel(c.dimension), 'y', c.dimension) : valAxis(this.pfLabel(c.metric),'y'),
@@ -3043,6 +3056,9 @@ function app(){
         case 'last_30d':     return {from:dayStart(29),   to};
         case 'last_90d':     return {from:dayStart(89),   to};
         case 'this_week':    return {from:weekStart(),    to};
+        case 'last_week':    return {from:this._addDays(weekStart(),-7), to:this._addDays(weekStart(),-1)};
+        case 'last_month':   return {from:isoOf(new Date(today.getFullYear(), today.getMonth()-1, 1)), to:isoOf(new Date(today.getFullYear(), today.getMonth(), 0))};
+        case 'last_year':    return {from:isoOf(new Date(today.getFullYear()-1,0,1)), to:isoOf(new Date(today.getFullYear()-1,11,31))};
         case 'last_4w':      return {from:dayStart(7*4-1),  to};
         case 'last_8w':      return {from:dayStart(7*8-1),  to};
         case 'last_12w':     return {from:dayStart(7*12-1), to};
@@ -3061,12 +3077,21 @@ function app(){
     },
     presetLabel(p){ return ({
       today:'Today', last_7d:'7 days', last_30d:'30 days', last_90d:'Last 90d',
-      this_week:'This week', last_4w:'Last 4w', last_8w:'Last 8w', last_12w:'Last 12w',
-      this_month:'This month', last_3m:'Last 3m', last_6m:'Last 6m', last_12m:'Last 12m',
+      this_week:'This week', last_week:'Last week', last_4w:'Last 4w', last_8w:'Last 8w', last_12w:'Last 12w',
+      this_month:'This month', last_month:'Last month', last_3m:'Last 3m', last_6m:'Last 6m', last_12m:'Last 12m',
       this_quarter:'This quarter', last_4q:'Last 4q', last_8q:'Last 8q',
-      custom:'Custom', mtd:'MTD', ytd:'This year', all_time:'All time'
+      custom:'Custom', mtd:'MTD', ytd:'This year', last_year:'Last year', all_time:'All time'
     })[p]||p; },
     rangeLabel(){ if(this.range.preset==='custom' && this.range.from && this.range.to) return `${this.range.from} → ${this.range.to}`; return this.presetLabel(this.range.preset); },
+    // The ACTUAL resolved dates for the active range (shown on the date button even for quick presets like
+    // "30 days"), so the user always sees which days are in view. Unbounded ranges keep their word label.
+    rangeDatesLabel(){
+      const {from,to}=this.resolveRange();
+      const f=d=>{ try{ return new Date(d+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }catch(e){ return d; } };
+      if(from && to) return `${f(from)} – ${f(to)}`;
+      if(!from && !to) return this.presetLabel(this.range.preset);   // all_time
+      return from ? ('from '+f(from)) : ('through '+f(to));
+    },
     allChips(){
       const out=[];
       for(const r of this.filters.global) out.push({scope:'global',field:r.field,op:r.op,text:`${r.field} ${r.op==='not_in'?'≠':':'} ${r.values.join(', ')}`});
@@ -3384,16 +3409,12 @@ function app(){
       })[p] || 'the previous period of the same length'; },
     deltaTipText(k){ const dir=k._delta>=0?'up':'down'; return `${Math.abs(k._delta||0).toFixed(1)}% ${dir} vs. ${this.comparePeriodPhrase()}`; },
     deltaTipHtml(k){
+      // Short and plain: how much, which way, vs. what. (No comparison-window line, no colour explainer.)
       const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
       const pct=Math.abs(k._delta||0).toFixed(1)+'%';
       const word=k._delta>=0?'higher':'lower';
-      const good=this.deltaGood(k);
-      let h=`<b>${pct} ${word}</b> than ${esc(this.comparePeriodPhrase())}`;
-      h+=`<br>Selected range: <b>${esc(this.rangeLabel())}</b>, compared with the equal-length period immediately before it.`;
-      h+=`<br><span class="src">${good?'Green — moving the favorable way for this metric.':'Red — moving the unfavorable way for this metric.'}</span>`;
-      return h; },
+      return `<b>${pct} ${word}</b> than ${esc(this.comparePeriodPhrase())}`; },
     chartSubtitle(c){ const a={sum:'Total',avg:'Average',distinct:'Distinct',ratio:'Pooled'}[c.agg]||''; let s=`${a} ${c.metric}${c.metricY?(' vs '+c.metricY):''} by ${c.dimension} · ${c.type}`;
-      if(c._unfiltered) s+=' · +context window';
       (c._skippedFilters||[]).forEach(f=> s+=` · all ${f} (filter skipped)`);
       return s; },
 

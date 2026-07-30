@@ -1,5 +1,27 @@
 # Prism App Framework — v2 changelog
 
+## v2.13.6 — KPI/chart/date-picker polish
+
+- **Removed the KPI sparklines.** They plotted a synthetic sine wave (not real data) — decorative noise.
+  KPI cards now show value + real period-over-period delta only.
+- **Removed the "+ context" pill** (and its chart-subtitle text). The time-context window still applies at
+  the default date state, but it's no longer surfaced as a pill (which confusingly vanished on date change).
+- **Categorical bar / rankedBar charts use a distinct colour per category** (matching the donut/treemap),
+  instead of one flat colour for the whole series.
+- **Tooltips: shorter and clearer.** Removed the "Exact: …" hover on the KPI value. The comparison
+  (delta) tooltip is now one line ("7.8% higher than the prior 30 days") — dropped the comparison-window
+  and colour-explainer lines. The info tooltip shows exactly three things: what the metric is, how it's
+  calculated, and its **Source** — with the reference `tooltip` text rewritten to be short *and* useful
+  (period, direction, what the number represents).
+- **Errors scope to where they happened.** A KPI that fails shows "Couldn't load this metric" in *that
+  card*; a chart that fails shows "Couldn't load this chart" in *that chart*; only app-wide/data-load
+  errors use the top banner (per-visual `k._err` / `c._err`).
+- **Date picker.** The date button now always shows the **actual resolved dates** (e.g. "Jul 1 – Jul 30,
+  2026") even for quick presets, not just "Custom". The picker is now a two-pane popover: the **full
+  preset list on the left** (Today, 7/30/90 days, This/Last week, This/Last month, This quarter, This
+  year, Last year, All time) and the **exact-date calendar on the right**. New `last_week` / `last_month`
+  / `last_year` presets; `rangeDatesLabel()` formats the button.
+
 ## v2.13.5 — funnel: richer step-breakdown table
 
 The funnel module's step table was rebuilt to answer "where and how badly does it leak" at a glance:

@@ -106,6 +106,12 @@ If yes, compose the `copysummary` module and set `table.copySummary: true` on th
 `modules/copysummary/COPYSUMMARY_MODULE_SPEC.md`). Do **not** set `copySummary` on any non-performance
 table — leaving it off is what gives it the plain automatic button.
 
+**Metric `tooltip` text — keep it SHORT.** Each KPI / chart / column `tooltip` should be one short line in
+the form `<calculation> — <plain one-line meaning>` (e.g. `SUM(revenue) ÷ SUM(spend) — dollars back per
+dollar spent.`). Don't restate the range or add colour/comparison explainers — the info popover already
+adds the **Source** line automatically, and the value/delta are self-evident. The hover tooltip shows
+exactly three things: what the metric is, how it's calculated, and where it comes from.
+
 **Interview additions (v2):** per Stage, also capture — per-tab `subtitle`; **per-KPI `agg`** —
 `sum` / `avg` / `distinct`, and **`ratio` (with `num`/`den`) for any rate or ratio** (ROAS, CTR, CPA,
 conversion rate): a ratio is `SUM(num) ÷ SUM(den)`, never `avg` of a per-row ratio column (principle

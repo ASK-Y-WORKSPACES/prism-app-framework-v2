@@ -74,10 +74,10 @@ OVERVIEW = """    {
       id:'overview', label:'Overview', icon:'grid', layout:'kpi-grid', source:'primary',
       subtitle:'Spend and return across all platforms, broken down by platform, device, and day.',
       kpis:[
-        { label:'Total Spend', agg:'sum', expr:'spend',   format:'currency', favorableUp:false, source:'Ad platforms', tooltip:'SUM(spend) across ad-platform rows over the filtered set.' },
-        { label:'Revenue',     agg:'sum', expr:'revenue', format:'currency', favorableUp:true,  source:'Ad platforms', tooltip:'SUM(revenue / conversion value) over the filtered set.' },
-        { label:'ROAS', agg:'ratio', num:'revenue', den:'spend',       format:'ratio',   favorableUp:true, source:'Ad platforms', tooltip:'SUM(revenue) ÷ SUM(spend) over the filtered set — pooled, not an average of per-row ratios.' },
-        { label:'CTR',  agg:'ratio', num:'clicks',  den:'impressions', format:'percent', favorableUp:true, source:'Ad platforms', tooltip:'SUM(clicks) ÷ SUM(impressions) over the filtered set — pooled, not an average of per-row rates.' },
+        { label:'Total Spend', agg:'sum', expr:'spend',   format:'currency', favorableUp:false, source:'Ad platforms', tooltip:'SUM(spend) — total ad money spent in the selected range.' },
+        { label:'Revenue',     agg:'sum', expr:'revenue', format:'currency', favorableUp:true,  source:'Ad platforms', tooltip:'SUM(revenue) — total sales value attributed to these campaigns.' },
+        { label:'ROAS', agg:'ratio', num:'revenue', den:'spend',       format:'ratio',   favorableUp:true, source:'Ad platforms', tooltip:'Revenue ÷ spend — dollars earned per dollar spent (e.g. 4× = $4 back per $1). Higher is better.' },
+        { label:'CTR',  agg:'ratio', num:'clicks',  den:'impressions', format:'percent', favorableUp:true, source:'Ad platforms', tooltip:'Clicks ÷ impressions — the share of impressions that led to a click.' },
       ],
       charts:[
         { title:'Spend over time', metric:'spend', agg:'sum', dimension:'event_date', type:'area',  sort:'asc',  palette:1, source:'Ad platforms', tooltip:'Daily SUM(spend) across ad platforms.' },
