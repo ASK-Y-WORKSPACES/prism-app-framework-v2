@@ -4,10 +4,12 @@
           <section class="bg-[var(--surface-elevated)] border border-[var(--border)] rounded-xl shadow-sm p-4">
             <div class="flex items-center justify-between mb-4">
               <div><h3 class="text-sm font-semibold" x-text="sec.funnelTitle||'Conversion funnel'"></h3>
-                <p class="text-xs text-[var(--muted-foreground)]" x-text="`${sec.funnel.steps.length} steps · count of ${sec.funnel.identity||'sessions'} reaching each step`"></p></div>
+                <p class="text-xs text-[var(--muted-foreground)]" x-text="`${sec.funnel.steps.length} steps · ` + (sec.funnel.steps.every(s=>s.metric!=null) ? 'per-step totals from the loaded rows' : `count of ${sec.funnel.identity||'rows'} reaching each step`)"></p></div>
             </div>
-            <div :id="`funnel-${sec.id}`" style="height:340px"></div>
-            <div x-show="(sec._funnel||[]).length===0 && !loading" class="text-center py-8 text-sm text-[var(--muted-foreground)]">No results match the selected filters.</div>
+            <!-- fail-loud: a bad step predicate / missing column shows HERE, never fabricated numbers (askycore#904) -->
+            <div x-show="sec._funnelError" class="mb-3 px-3 py-2.5 rounded-lg border border-[var(--negative)] bg-[var(--negative-light)] text-sm text-[var(--negative)]" x-text="'Funnel not computed — '+sec._funnelError"></div>
+            <div :id="`funnel-${sec.id}`" style="height:340px" x-show="!sec._funnelError"></div>
+            <div x-show="(sec._funnel||[]).length===0 && !loading && !sec._funnelError" class="text-center py-8 text-sm text-[var(--muted-foreground)]">No results match the selected filters.</div>
           </section>
           <section class="bg-[var(--surface-elevated)] border border-[var(--border)] rounded-xl shadow-sm p-4 overflow-x-auto">
             <div class="flex items-center justify-between mb-4">

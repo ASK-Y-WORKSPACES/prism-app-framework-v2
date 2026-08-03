@@ -1,5 +1,26 @@
 # Prism App Framework — v2 changelog
 
+## v2.14.0 — funnel: real per-step computation (fixes askycore#904)
+
+The declarative funnel card **fabricated its stage counts**: `computeFunnel()` invented a base
+(`rows.length * 100`, or total impressions if larger) and multiplied it down by a hard-coded
+`step.rate` (default 0.5) — `step.sql` was never read, so every funnel shipped plausible-looking
+numbers disconnected from the data (first caught on the AOLCC Franchise Performance app, finding B1).
+
+- **`step.sql` is now actually evaluated** against the loaded rows via a small SQL-predicate
+  compiler (`AND OR NOT`, parens, comparisons, `IS [NOT] NULL`, `[NOT] IN`, `[NOT] LIKE`,
+  column-to-column). Steps CHAIN — a row reaches step *i* only if it satisfies steps 1..*i* — and
+  the count is `COUNT(DISTINCT funnel.identity)` when that column exists, else the row count.
+- **New `step.metric` mode** for aggregate-grain rows: each step SUMs a real column
+  (impressions → clicks → conversions). All steps must use one mode.
+- **`step.rate` is dead and rejected.** A rate-only step, an unparseable predicate, a column
+  missing from the loaded rows, or mixed modes throws; `loadSection` surfaces it as a
+  "Funnel not computed — …" banner on the tab (`sec._funnelError`). Silent-zero and
+  silent-fabrication are both impossible now.
+- Funnels genuinely react to slicers/date filters (they compute over the same filtered rows as
+  every other card), and the demo preset configs were rewritten to columns that exist in the
+  synthetic dataset (`presets/funnel` demos sql mode, `presets/dashboard` metric mode).
+
 ## v2.13.6 — KPI/chart/date-picker polish
 
 - **Removed the KPI sparklines.** They plotted a synthetic sine wave (not real data) — decorative noise.

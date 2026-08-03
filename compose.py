@@ -120,22 +120,25 @@ CAMPAIGNS = """    {
     },"""
 CONVERSION_DASH = """    {
       id:'conversion', label:'Conversion', icon:'funnel', layout:'funnel', source:'primary',
-      subtitle:'Where sessions drop off across the journey, from impression to conversion.',
-      funnelTitle:'Acquisition funnel', funnel:{ identity:'sessions', steps:[
-        { name:'Impressions', rate:1,    sql:'TRUE' },
-        { name:'Clicks',      rate:0.32, sql:'clicks > 0' },
-        { name:'Add to cart', rate:0.45, sql:'add_to_cart = 1' },
-        { name:'Conversions', rate:0.38, sql:'conversions > 0' },
+      subtitle:'Volume at each stage of the journey, from impression to conversion — real sums over the loaded rows.',
+      // metric mode: each step SUMs a real column of the (aggregate-grain) rows. No `rate` — counts
+      // are never invented (askycore#904). For event-grain data use `sql` predicates instead.
+      funnelTitle:'Acquisition funnel', funnel:{ steps:[
+        { name:'Impressions', metric:'impressions' },
+        { name:'Clicks',      metric:'clicks' },
+        { name:'Conversions', metric:'conversions' },
       ]},
     },"""
 CONVERSION_FUNNEL = """    {
       id:'conversion', label:'Conversion', icon:'funnel', layout:'funnel', source:'primary',
-      subtitle:'Where sessions drop off across the journey, from first touch to conversion.',
-      funnelTitle:'Acquisition funnel', funnel:{ identity:'sessions', steps:[
-        { name:'Visited',     rate:1,    sql:'TRUE' },
-        { name:'Engaged',     rate:0.52, sql:'engaged = 1' },
-        { name:'Add to cart', rate:0.41, sql:'add_to_cart = 1' },
-        { name:'Purchased',   rate:0.36, sql:'purchases > 0' },
+      subtitle:'Where campaigns drop off across the journey — each stage counts the campaigns whose data really satisfies it.',
+      // sql mode: steps CHAIN — a row reaches step i only if it satisfies every predicate up to i;
+      // the count is DISTINCT `identity` (falls back to row count). No `rate` (askycore#904).
+      funnelTitle:'Campaign conversion funnel', funnel:{ identity:'campaign_id', steps:[
+        { name:'All campaigns', sql:'TRUE' },
+        { name:'Got clicks',    sql:'clicks > 0' },
+        { name:'Converted',     sql:'conversions > 0' },
+        { name:'Profitable',    sql:'revenue > spend' },
       ]},
     },"""
 SEGMENTS = """    {
