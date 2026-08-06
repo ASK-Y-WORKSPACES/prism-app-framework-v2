@@ -11,7 +11,7 @@ these helpers; this folder is the authoritative reference.
   `gw`/`gwWrite`/`gwCreate`, `providerError`, `queryAny`). Inlined into `base/`;
   importable directly for a non single-file build.
 - **`dev-proxy.mjs`** — optional local token-injecting proxy, only for previewing
-  **real** data on localhost. Never used in production or synthetic mode.
+  **real** data on localhost. Never used in production.
 
 The **project-spec** the user attaches fills the values (slug, workspace/project
 ids, named table ids, provider/account). No secrets are bundled — deployed apps

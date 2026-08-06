@@ -54,7 +54,7 @@ async function queryAny(ds, spec){
   throw new Error('Unknown data source kind: '+ds.kind);
 }
 
-/* ── Chat / agent: /<slug>/api/chat/{start,respond,poll} (real mode; synthetic stubs in base) ──
+/* ── Chat / agent: /<slug>/api/chat/{start,respond,poll} (requires deployed Mode-2 cookie auth) ──
    chatStart(text)  -> POST /chat/start   -> { investigationId }
    chatRespond(id,text) -> POST /chat/respond
    chatPoll(id,cursor)  -> POST /chat/poll { waitMs:8000 } until terminal | awaiting_input  */

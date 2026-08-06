@@ -126,7 +126,7 @@
         <template x-if="opt.cs.phase==='confirm'">
           <div class="mb-3 flex items-start gap-2 rounded-lg border border-[var(--warning)] bg-[var(--warning-light)] p-2.5 text-xs">
             <span class="mt-0.5 shrink-0" x-html="icon('warning')"></span>
-            <span x-text="!optSourceConnected(e.source) ? ('This platform has no API connection, so this app can’t create the ad set. Continue to get your finished copy and a link to add it as a new PAUSED ad set in the platform yourself — it’s logged here for your records.') : (dataSource==='real' ? ('This duplicates the current ad set (keeping its settings) inside '+e.name+', adds a new ad with your copy, and leaves it PAUSED on your live account — you enable it natively in the platform.') : 'Demo mode: this is simulated — it logs a paused-ad-set batch to Staging/History without touching a live account.')"></span>
+            <span x-text="!optSourceConnected(e.source) ? ('This platform has no API connection, so this app can’t create the ad set. Continue to get your finished copy and a link to add it as a new PAUSED ad set in the platform yourself — it’s logged here for your records.') : ('This duplicates the current ad set (keeping its settings) inside '+e.name+', adds a new ad with your copy, and leaves it PAUSED on your live account — you enable it natively in the platform.')"></span>
           </div>
         </template>
         <template x-if="opt.cs.applyErr"><div class="mb-2 rounded-lg border border-[var(--negative)] bg-[var(--negative-light)] p-2 text-[11px] text-[var(--negative)]" x-text="opt.cs.applyErr"></div></template>

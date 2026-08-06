@@ -261,9 +261,9 @@ The shell is the universal scaffold. Every module type's `index.html`
   with Phosphor-style icons → mode/version footer with deployed/local dot.
 - **Header** (56 px tall, fixed top, offset by sidebar width): app title
   + `MODULE` pill + freshness indicator (color dot + relative time) +
-  `(Local)`/`(UTC)` toggle + `Real`/`Synthetic` toggle + spacer + command
+  `(Local)`/`(UTC)` toggle + spacer + command
   palette search button with `⌘K` hint + `Include cancellations` checkbox
-  + `Save view` button + `Reset` button + `?` help + `i` about + avatar.
+  + `Save view` button + `Reset` button + `?` help + `i` about.
 - **Empty `<main>`** (offset by sidebar width, with `pt-[56px]` for header).
 - **Slicer panel slot** (right edge, conditional `x-show="openSlicers.length > 0"`, 320 px wide).
 - **Command palette modal slot** (conditional `x-show="commandPaletteOpen"`).
@@ -288,7 +288,6 @@ function app() {
     compare: 'prior',                              // 'off' | 'prior' | 'yoy'
     includeCancellations: false,
     tz: 'local',                                   // 'local' | 'UTC'
-    dataSource: 'real',                            // 'real' | 'synthetic'
     drillHistory: [],
 
     // Slicer UI
@@ -537,7 +536,7 @@ Dispatcher: given a widget config, renders the appropriate widget primitive (kpi
 
 Floating "ask me anything!" pill in the bottom-right corner. 8 px mascot circle + label. Click → opens the chat panel.
 
-Hidden when `chatOpen` is true (panel takes over the corner) and when `dataSource === 'synthetic'` (chat requires real backend auth via Mode-2 cookie).
+Hidden when `chatOpen` is true (panel takes over the corner). Chat requires the deployed app's Mode-2 cookie auth to answer.
 
 ### 5.17 `chat-panel.html`
 
@@ -584,7 +583,7 @@ No interview turn — the agent does this automatically. User can request edits.
 
 ### Auth caveat
 
-Chat requires Mode-2 (cookie auth). When `dataSource === 'synthetic'` or the app is running outside the deployed apps host, chat will return 401. The launcher's `x-show` includes `dataSource === 'real'` (in shell template); in synthetic mode the launcher is hidden entirely.
+Chat requires Mode-2 (cookie auth). When the app is running outside the deployed apps host, chat will return 401 and surfaces an error rather than a fabricated answer.
 
 ---
 
@@ -802,7 +801,7 @@ Total target: < 30 minutes wall-clock for a v1 dashboard, < 60 minutes for a v1 
 Reproduced in DESIGN.md but listed here for orientation:
 
 - [ ] Sidebar renders with brand row + 8 nav items + mode/version footer
-- [ ] Header renders with title + MODULE pill + freshness + Local/UTC + Real/Synthetic + ⌘K + Include cancellations + Save view + Reset + ? + i + avatar
+- [ ] Header renders with title + MODULE pill + freshness + Local/UTC + ⌘K + Include cancellations + Save view + Reset + ? + i
 - [ ] Filter bar renders with date + granularity + compare + pinned slicers + + Add filter + Clear all
 - [ ] Insights band renders (with placeholder copy if no live insights)
 - [ ] Module-type density floor met (dashboard: ≥4 KPIs + 1 chart + ≥2 breakdowns; funnel: chart + step table + trended)
@@ -946,69 +945,39 @@ in `test-project/HOW_TO_TEST.md`.
 
 ---
 
-## 17. Data source contract — `Real` ↔ `Synthetic` toggle
+## 17. Data source contract — real data only
 
-Every module-type starter ships with a **data-source toggle** in the header (database icon = `real` / test-tube icon = `synthetic`). The sidebar footer mirrors it as `● DEPLOYED mode` vs `● DEMO mode`. State slot:
-
-```js
-dataSource: 'real' | 'synthetic'   // default: 'real'
-```
-
-### Contract: every data-fetching method MUST branch on `dataSource`
+Apps load **live data only** — there is no synthetic/demo data mode and no data-source toggle in the header. Every data-fetching method fetches from the connected sources and fails loud when none are reachable (rather than silently showing fabricated numbers).
 
 ```js
-async loadAll() {
+async loadData() {
   this.loading = true;
   this.error = null;
   try {
-    if (this.dataSource === 'synthetic') {
-      // The kpis[] / breakdowns[] / insights[] / funnelSteps[] arrays
-      // baked into the factory ARE the synthetic dataset. Nothing to fetch.
-    } else {
-      // Real mode — fan out queryModel(...) calls, populate the same arrays.
-    }
+    // Fan out queryModel(...) / gateway calls, populate _sourceRows per source.
+    // When no source is reachable (e.g. local file:// preview), surface an
+    // explanatory banner rather than silently showing numbers.
   } catch (e) { this.error = e.message; }
   this.loading = false;
 },
 ```
 
-### Why both modes are useful
+### Local preview
 
-| | Synthetic | Real |
-|---|---|---|
-| Local file:// preview | ✓ everything renders | ✗ no API reachable |
-| Recording demos | ✓ deterministic data | ✗ data changes daily |
-| First-paint of newly deployed app | ✓ instant | ✗ waits for warehouse cold-start |
-| Real customer use | ✗ wrong numbers | ✓ |
-| Chat panel | ✗ hidden (Mode-2 auth unavailable) | ✓ |
-
-The chat launcher already correctly hides in synthetic mode via `x-show="!chatOpen && dataSource === 'real'"`.
+Opening `index.html` from `file://` has no reachable endpoint, so the app renders its chrome and shows the "No data endpoint reachable" banner. To preview against live data locally, run `connections/dev-proxy.mjs`; deployed under its app slug the app reads through the session cookie.
 
 ### Build-agent responsibility
 
-When wiring the real-mode branch, the build agent:
+When wiring the loader, the build agent:
 
 1. Reads the `## App` section's primary prism + KPIs / steps definitions.
-2. Generates a `queryModel(prismName, sql)` call per KPI / breakdown / insight / funnel step.
-3. Populates the corresponding entry in the baked-in arrays — e.g. `this.kpis[0].value = formatCurrency(rows[0].total, true)`.
-4. Calls `applyFilters(...)` against `effectiveFilters(this.filters)` so the active filter set + date range + drill state flow through into the SQL.
-5. Uses `MAX(date_column)` against the primary prism to set `this.freshness.ts`.
-
-The build agent does NOT need to invent the synthetic mode — it's already in the baked-in arrays, which the agent populates earlier in the build for visual polish before deploy.
+2. Generates a `queryModel(prismName, sql)` call per source, populating `_sourceRows`.
+3. Routes each section's rows by its `source`, applying the active filter set + date range + drill state client-side.
+4. Uses `MAX(date_column)` against the primary prism to set freshness.
 
 ### Project-spec implication
 
-The `interview-answers.md` / `## App` section already carries enough information (primary prism, date column, KPI SQL fragments, step predicates, identity column) for the agent to write the real-mode queries. No additional interview stage needed.
-
-### When synthetic data needs richer shape
-
-If a project has unusual KPI shapes (e.g. computed ratios across multiple prisms) the baked-in demo arrays may not be representative. In that case the agent should:
-
-- Generate plausible synthetic numbers that match the KPI's format (currency / percent / etc.) — same precision, same order of magnitude as the real data.
-- For breakdowns, generate 5–7 entries with a plausibly-skewed distribution (one dominant, a long tail).
-- For sparklines, generate 12 monotonic-ish values with mild noise.
-
-The goal: synthetic mode should look like a real dashboard, not like a placeholder.
+The `interview-answers.md` / `## App` section already carries enough information (primary prism, date column, KPI SQL fragments, step predicates, identity column) for the agent to write the queries. No additional interview stage needed.
 
 ---
 

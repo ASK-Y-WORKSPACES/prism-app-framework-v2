@@ -160,7 +160,7 @@ opens Staging, toasts.
 One row per sent batch, newest first: When · Source badge · Batch · Changes · Platforms · Status ·
 Receipt. Status vocabulary (exact): `AWAITING PLATFORM APPROVAL` (amber) · `LIVE — approved in
 platform HH:MM` (green) · `REJECTED IN PLATFORM — draft discarded by operator` (red). Receipt
-column: `opens at go-live` → `scores +7d` (synthetic mode adds a `simulate +7d` control) →
+column: `opens at go-live` → `scores +7d` →
 `✓ beat forecast — …` / `~ partial miss — …` / `✗ miss — …`. Row click expands the full change
 table + forecast/outcome detail + `Revert` (stages the inverse as a new draft).
 
@@ -170,7 +170,7 @@ table + forecast/outcome detail + `Revert` (stages the inverse as a new draft).
 
 At send: pause → saved/day = est. daily spend; budget ±% → Δspend/day; creative → "recovers CPA
 12–18%" copy; negatives → "saves 5–15% of wasted search spend" copy. Confidence `med` when ≥3
-changes, else `low`. At +7d a scoring job (simulated in synthetic mode) writes the verdict:
+changes, else `low`. At +7d a scoring job writes the verdict:
 `beat / met / partial_miss / miss`. Calibration copy on rec cards ("calibrated 78%, n=142") is
 seeded static until real receipt aggregates reach n≥30.
 
@@ -193,7 +193,7 @@ of rule #1.**
 ### Creative studio (refresh ad copy → new paused ad set)
 A direct action, not a cart change — the result is *inherently* platform-staged (a **paused** ad
 set that spends nothing until enabled natively). Generate variants (Asky investigation agent
-`/chat/start`+`/chat/poll`; canned variants in synthetic mode) → pick & edit (char budgets
+`/chat/start`+`/chat/poll`) → pick & edit (char budgets
 40/125/30) → confirm. Logged to Staging/History as a `platform_staged` batch. Real writes require
 `optimize.creative.accountPath`.
 
@@ -208,9 +208,6 @@ set that spends nothing until enabled natively). Generate variants (Asky investi
 - **Security:** writes only via declared gateways; sends for not-connected sources never claim
   success; deep-links open the operator's own authenticated session; the module never handles
   platform credentials; every batch records provenance (Agent/Bulk/Console/Manual) and status.
-- **Demo fallback:** with nothing connected the module runs on synthetic rows spanning every
-  configured source; sends are simulated; the `simulate +7d` control drives receipt scoring so the
-  **full loop is demoable offline**: rec → stage → send → approve → LIVE → verdict.
 
 ---
 
@@ -243,8 +240,8 @@ Standing up Optimize on a new Prism = author this one block. No engine/UI change
    the last change removes the batch.
 5. Send produces per-platform lanes with correct connected/not-connected copy + deep links; batch
    status becomes `AWAITING PLATFORM APPROVAL`; approve/reject is recorded, never performed, by the app.
-6. Every sent batch has a forecast frozen at send; live batches score a verdict at +7d (simulated
-   control in synthetic mode); history shows all three statuses with the exact vocabulary.
+6. Every sent batch has a forecast frozen at send; live batches score a verdict at +7d;
+   history shows all three statuses with the exact vocabulary.
 7. Revert stages inverse changes as a new draft — no in-place undo.
-8. The full loop works offline in synthetic mode end-to-end.
+8. The full loop works end-to-end against connected platforms: rec → stage → send → approve → LIVE → verdict.
 9. Re-pointing at a different Prism requires only a new `optimize` config.

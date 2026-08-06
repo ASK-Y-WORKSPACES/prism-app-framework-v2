@@ -179,13 +179,13 @@ table.columns: [{ key, label, type, source, tooltip }]                  // sourc
 visible failure, by design. Keep the **never sum a rate/ratio** rule from v2: rates (CTR) and
 ratios (ROAS) use `agg:'avg'`, never `sum`.
 
-### C. Data modes — one source of truth, idempotent both directions
+### C. Data loading — live data only
 
-There is exactly one source of truth for the data mode: `dataSource` (`'synthetic'` | `'real'`).
-Flipping it goes through **`setDataMode(mode)`** only — never an inline relabel. `setDataMode`:
-- drops the previous dataset (`_rows=[]`) and resets the chat session, then runs a **full reload**;
-- is **idempotent in both directions** — synthetic mode *always* regenerates `synthRows`, real mode
-  *always* refetches. Switching back never leaves the previous dataset in place behind a new label.
+Apps load **live data only** — there is no synthetic/demo data mode and no data-source toggle.
+`loadData()` fans out `queryModel(...)` / gateway calls and populates `_sourceRows` per source. When
+no source is reachable (e.g. local `file://` preview) it surfaces the "No data endpoint reachable"
+banner rather than silently showing fabricated numbers. Reuse of the fetch cache is keyed on the
+loaded date window only (a wider range forces a refetch; categorical filters are applied client-side).
 
 ---
 
@@ -492,7 +492,7 @@ Run through each item. Any failure → fix before signaling complete.
 
 - [ ] Sidebar renders with brand row (workspace initial + name + "ANALYTICS" eyebrow) + WORKSPACE label + 8 nav items + mode/version footer
 - [ ] Sidebar collapse toggle works (220 ↔ 60 px)
-- [ ] Header renders 56 px tall with: app title · MODULE pill · freshness dot + "Updated X ago" · (Local)/(UTC) toggle · Real/Synthetic toggle · spacer · search bar with ⌘K hint · Include cancellations checkbox · Save view · Reset · ? · i · avatar
+- [ ] Header renders 56 px tall with: app title · MODULE pill · freshness dot + "Updated X ago" · (Local)/(UTC) toggle · spacer · search bar with ⌘K hint · Include cancellations checkbox · Save view · Reset · ? · i
 - [ ] Filter bar sticky below header with: date trigger · granularity radio · compare radio · divider · pinned slicer triggers · + Add filter · spacer · Clear all (n)
 - [ ] Slicer panel mounts on right edge (320 px) when `openSlicers.length > 0`; picking a value does NOT close it
 - [ ] Command palette modal opens on ⌘K and on `+ Add filter`
@@ -515,7 +515,7 @@ Run through each item. Any failure → fix before signaling complete.
 - [ ] Every KPI, chart series, and labelled table column has both `source` and `tooltip` set (no “Source: not specified” tooltips in the shipped app)
 - [ ] Hovering any metric's info icon shows the explanation **immediately** (custom `.mtip`, not native `title` delay), stating what it is · how it's calculated · which source
 - [ ] Rates (CTR) and ratios (ROAS) use `agg:'avg'`, never `sum`
-- [ ] The data-mode toggle calls `setDataMode()`; switching Synthetic⇄Real triggers a full reload **both ways** (synthetic regenerates, real refetches — never a stale relabel)
+- [ ] `loadData()` fetches live data only (no synthetic mode); when no source is reachable it surfaces the "No data endpoint reachable" banner rather than fabricated numbers
 
 ### Discipline
 
@@ -547,7 +547,7 @@ Run through each item. Any failure → fix before signaling complete.
 ### Chat (every module)
 
 - [ ] Floating "ask me anything!" pill renders in the bottom-right corner
-- [ ] Pill hides when chat panel is open or in synthetic data mode
+- [ ] Pill hides when the chat panel is open
 - [ ] Panel slides in from the right (440px wide), with mascot header + greeting + message list + input + starter chips
 - [ ] Empty-state greeting renders when `chatMessages.length === 0`
 - [ ] Send fires `POST /api/chat/start` on first message, `POST /api/chat/respond` on subsequent

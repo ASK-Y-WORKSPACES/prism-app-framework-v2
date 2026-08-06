@@ -72,8 +72,8 @@ const APP_CONFIG = {
     attribute sessions to ad rows.
   - **Every metric explains itself.** Every KPI / chart series / table column carries `source` + `tooltip`
     and shows them on hover **immediately** (what it is · how it's calculated · which source). Mandatory.
-  - **One data-mode source of truth.** The toggle calls `setDataMode()`; Synthetic⇄Real does a full,
-    idempotent reload both ways — never a stale relabel.
+  - **Live data only.** Apps load live data through `loadData()` — there is no synthetic/demo data
+    mode and no data-source toggle. When no source is reachable, surface a banner, never fake numbers.
 
 **Prism AI chat — ALWAYS on, never asked.** Every app ships with the Prism AI chat panel (the launcher +
 chat panel are already in `base/` and every module-type starter). Include it in **every** app by default
@@ -176,7 +176,7 @@ the same-origin session cookie.
 12. **DuckDB dialect ONLY — no Postgres/Snowflake-isms.** The engine is DuckDB. Banned in generated SQL: `INITCAP`, `NOW()`, `GETDATE()`, `DATEADD`/`DATEDIFF`, `IFNULL`/`NVL`, `LISTAGG`, `x::type` shorthand. A single unsupported function makes that source's query error and return zero rows — and if only *some* sources fail there is no error banner, just empty tabs. Keep SQL to `SELECT … CAST/TRY_CAST/COALESCE/NULLIF/strftime/strptime/json_extract_string/CASE`; do all casing/labeling/formatting (e.g. title-casing device names) in the **JS normalizer**, never in SQL.
 13. **Validate every generated query against a local DuckDB before zipping.** `pip install duckdb`, create mock tables matching the schema column names/types, and run each loader's exact SQL string. This is offline (no live endpoint, no cookie — compatible with #11) and catches dialect errors like #12 pre-deploy. If `duckdb` can't be installed, hand-audit every function against the DuckDB function list.
 14. **Fail loud per source — never silently empty.** When an app has multiple `dataSources`, a single failing query must surface its own banner (`"<provider> query failed: <ErrorMessage>"`), not just yield an empty tab. Only show the generic "no endpoint reachable" banner when *all* sources fail. Silent per-source zeros read as "no data" and hide the real bug.
-15. **Prism tables are NOT the only data — use every connection.** The project-spec's `## Linked API Gateways` section lists connections (Meta/`fbads`, Google Ads, CRMs, …) that frequently have **no Prism table**; their data is reachable only via `/<slug>/api/gw/{name}/...`. Source from Prism **and** every relevant gateway, normalizing + merging gateway rows into the matching rowset — otherwise that platform's data is silently absent (the *"my Meta campaigns don't show"* bug). Send `X-Workspace-Id` + `credentials:'include'` on gateway calls, and add a synthetic generator so demo mode mirrors the gateway too. See interview Step 3a.5.
+15. **Prism tables are NOT the only data — use every connection.** The project-spec's `## Linked API Gateways` section lists connections (Meta/`fbads`, Google Ads, CRMs, …) that frequently have **no Prism table**; their data is reachable only via `/<slug>/api/gw/{name}/...`. Source from Prism **and** every relevant gateway, normalizing + merging gateway rows into the matching rowset — otherwise that platform's data is silently absent (the *"my Meta campaigns don't show"* bug). Send `X-Workspace-Id` + `credentials:'include'` on gateway calls. See interview Step 3a.5.
 
 ---
 
@@ -328,8 +328,7 @@ serves), and ask *"Which of these connections should this app pull from?"* For e
 - **normalize its response into the SAME flat row shape** as the matching source and **merge** it into that rowset
   (e.g. Meta campaigns merged into the ad rows next to Google Ads), so every tab/KPI/Optimize works across both;
 - send `X-Workspace-Id` + `credentials:'include'` on every gateway call (the `gw()`/`queryAny` helpers do this);
-- load each connection independently with the per-source fail-loud guard (pitfall #14), and add a synthetic
-  generator so demo mode mirrors it.
+- load each connection independently with the per-source fail-loud guard (pitfall #14).
 
 Treat a gateway with no Prism counterpart as a first-class source, not an afterthought.
 

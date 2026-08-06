@@ -3,8 +3,8 @@
   ════════════════════════════════════════════════════════════════════════════
   Prism App Framework v2 — Dashboard starter (config-driven, multi-tab)
   ────────────────────────────────────────────────────────────────────────────
-  This is a WORKING reference app. Open it directly in a browser (synthetic mode)
-  to see the chrome + every section render before any agent edits.
+  This is a WORKING reference app. Open it directly in a browser to see the
+  chrome + every section render before any agent edits.
 
   To build a real app: fill APP_CONFIG (one object, bottom of <script>). Each
   `sections[]` entry is a tab with its own layout / KPIs / charts / table / source.
@@ -143,7 +143,6 @@
   <button @click="paletteMode='search'; commandPaletteOpen=true" class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--surface-elevated)] border border-[var(--border)] text-sm text-[var(--placeholder)] hover:border-[var(--primary)] hover:text-[var(--foreground)] min-w-[200px]">
     <span x-html="icon('search')"></span><span class="flex-1 text-left">Search…</span><kbd class="text-[10px] px-1 py-0.5 rounded border border-[var(--border)]">⌘K</kbd>
   </button>
-  <div class="w-7 h-7 rounded-full bg-[var(--primary)] text-white flex items-center justify-center text-xs font-semibold">Y</div>
 </header>
 
 <!-- ══ MAIN ══ -->
@@ -668,7 +667,6 @@
                           <template x-if="b.status==='platform_staged'"><span class="text-[var(--muted-foreground)]">starts once you approve go-live</span></template>
                           <template x-if="b.status==='live'&&!b.outcome">
                             <span class="text-[var(--muted-foreground)]">checked after 7 days
-                              <button x-show="dataSource==='synthetic'" @click.stop="optScore(b)" class="ml-1 text-[10px] px-1.5 py-0.5 rounded border border-[var(--border)] hover:border-[var(--primary)] hover:text-[var(--primary)]">simulate 7-day check</button>
                             </span>
                           </template>
                           <template x-if="b.outcome">
@@ -1216,7 +1214,7 @@
         <template x-if="opt.cs.phase==='confirm'">
           <div class="mb-3 flex items-start gap-2 rounded-lg border border-[var(--warning)] bg-[var(--warning-light)] p-2.5 text-xs">
             <span class="mt-0.5 shrink-0" x-html="icon('warning')"></span>
-            <span x-text="!optSourceConnected(e.source) ? ('This platform has no API connection, so this app can’t create the ad set. Continue to get your finished copy and a link to add it as a new PAUSED ad set in the platform yourself — it’s logged here for your records.') : (dataSource==='real' ? ('This duplicates the current ad set (keeping its settings) inside '+e.name+', adds a new ad with your copy, and leaves it PAUSED on your live account — you enable it natively in the platform.') : 'Demo mode: this is simulated — it logs a paused-ad-set batch to Staging/History without touching a live account.')"></span>
+            <span x-text="!optSourceConnected(e.source) ? ('This platform has no API connection, so this app can’t create the ad set. Continue to get your finished copy and a link to add it as a new PAUSED ad set in the platform yourself — it’s logged here for your records.') : ('This duplicates the current ad set (keeping its settings) inside '+e.name+', adds a new ad with your copy, and leaves it PAUSED on your live account — you enable it natively in the platform.')"></span>
           </div>
         </template>
         <template x-if="opt.cs.applyErr"><div class="mb-2 rounded-lg border border-[var(--negative)] bg-[var(--negative-light)] p-2 text-[11px] text-[var(--negative)]" x-text="opt.cs.applyErr"></div></template>
@@ -1449,97 +1447,6 @@ const ASKY_CUBE = '<svg width="18" height="18" viewBox="0 0 48 48" xmlns="http:/
 const ASKY_WORDMARK = '<span style="font-weight:800;font-size:13px;letter-spacing:.4px;color:#26324d;line-height:1">ASK-Y</span>';
 const ASKY_LOGO = '<span style="display:inline-flex;align-items:center;gap:5px">'+ASKY_CUBE+ASKY_WORDMARK+'</span>';
 
-/* ══════════════════════════ SYNTHETIC DATA (demo mode) ══════════════════════════ */
-const PLATFORMS=['Search','Social','Video','Display'];   // generic channel demo values (no real product names)
-const DEVICES=['Mobile','Desktop','Tablet'];
-const STATUSES=['ACTIVE','PAUSED','ENDED'];
-const OBJECTIVES=['Conversions','Traffic','Awareness'];
-// Each synthetic campaign has a real FLIGHT — an active window [active_from, active_to] of
-// flight_days — plus a per-day baseline (_dSpend/_dImpr/…). The top-level spend/impressions/…
-// are the whole-flight totals (= baseline × flight_days). rowsForSection() filters a campaign in
-// only when its flight OVERLAPS the active date range and prorates its metrics to the in-range
-// days, so a campaign that wasn't running in the selected range never appears (and never gets a
-// fabricated day-by-day breakdown). Real mode mirrors this: the warehouse SUMs over WHERE date in
-// range, which is 0 rows for an inactive campaign.
-function synthRows(n){
-  // Anchor flights to TODAY so the demo always looks current — recent date presets (Last 7d/30d)
-  // show the campaigns that were running in that window instead of an empty table.
-  const rows=[]; const anchor=new Date(); const iso=d=>d.toISOString().slice(0,10);
-  for(let i=0;i<n;i++){
-    const plat=PLATFORMS[i%PLATFORMS.length], dev=DEVICES[i%DEVICES.length], obj=OBJECTIVES[i%3];
-    const dSpend = 40 + Math.abs(Math.sin(i*1.7))*1200;              // per-day baseline
-    const dClicks= dSpend*(0.4+Math.abs(Math.cos(i))*1.6);
-    const dImpr  = dClicks*(20+Math.abs(Math.sin(i*2.3))*60);
-    const dConv  = dClicks*(0.01+Math.abs(Math.sin(i*0.7))*0.06);
-    const dRev   = dConv*(30+Math.abs(Math.cos(i*1.1))*120);
-    const flightDays = 6 + (i*7)%34;                                 // 6..39 active days
-    const endOffset  = (i*13)%56;                                    // flight ended 0..55 days before anchor
-    const aTo=new Date(anchor); aTo.setDate(aTo.getDate()-endOffset);
-    const aFrom=new Date(aTo);  aFrom.setDate(aFrom.getDate()-(flightDays-1));
-    const spend=dSpend*flightDays, clicks=Math.round(dClicks*flightDays),
-          impr=Math.round(dImpr*flightDays), conv=Math.round(dConv*flightDays), rev=dRev*flightDays;
-    rows.push({
-      campaign_id:'c'+(1000+i), campaign_name:plat+' · '+obj+' '+(i+1),
-      platform:plat, device:dev, objective:obj,
-      status:STATUSES[i%6===0?2:(i%3===0?1:0)],
-      spend, impressions:impr, clicks, conversions:conv, revenue:rev,
-      ctr: clicks/Math.max(impr,1), roas: rev/Math.max(spend,1), cpa: conv?spend/conv:null,
-      active_from: iso(aFrom), active_to: iso(aTo), flight_days: flightDays,
-      _dSpend:dSpend, _dImpr:dImpr, _dClicks:dClicks, _dConv:dConv, _dRev:dRev,
-      event_date: iso(aTo),
-      creative:'https://picsum.photos/seed/'+i+'/64/40'
-    });
-  }
-  return rows;
-}
-
-/* ── config-aware synthetic data ── demo mode must never be all-zeros for ANY app. Each source gets rows
-   carrying exactly the fields ITS sections reference (KPI exprs, chart metric/dimension, table columns,
-   funnel steps, slicers). Campaign-like sources keep the rich flighted synthRows demo (proration + daily
-   breakdown); every other source gets generic non-zero rows whose value TYPE is inferred from the field
-   name (date / id / dimension / rate / metric). This is what makes every built app behave the same. */
-function synthDays(n){ const out=[], a=new Date(); for(let i=n-1;i>=0;i--){ const d=new Date(a); d.setDate(d.getDate()-i); out.push(d.toISOString().slice(0,10)); } return out; }
-function synthFieldsForSource(id){
-  const fields=new Set(), dims=new Set(); const dateField=(APP_CONFIG.dataSources[id]||{}).dateCol||'';
-  for(const sec of (APP_CONFIG.sections||[])){ if(((sec.source)||'primary')!==id) continue;
-    (sec.kpis||[]).forEach(k=>k.expr&&fields.add(k.expr));
-    (sec.charts||[]).forEach(c=>{ c.metric&&fields.add(c.metric); c.metricY&&fields.add(c.metricY); if(c.dimension){ fields.add(c.dimension); dims.add(c.dimension); } });
-    ((sec.table&&sec.table.columns)||[]).forEach(col=>col.key&&fields.add(col.key));
-    ((sec.funnel&&sec.funnel.steps)||[]).forEach(s=>{ s.metric&&fields.add(s.metric); s.web&&fields.add(s.web); });
-  }
-  (APP_CONFIG.slicers||[]).forEach(s=>{ if(s.field){ fields.add(s.field); dims.add(s.field); } });
-  return { fields:[...fields], dims, dateField };
-}
-const SYNTH_VOCAB={
-  channel:['Organic Search','Direct','Paid Social','Paid Search','Referral','Email','Display','Organic Social'],
-  platform:['Meta','Google','LinkedIn','TikTok','Microsoft'], device:['Mobile','Desktop','Tablet'],
-  objective:['Conversions','Traffic','Awareness'], status:['ACTIVE','PAUSED','ENDED'], country:['US','UK','DE','FR','IL','CA'],
-  _default:['Group A','Group B','Group C','Group D','Group E','Group F','Group G','Group H'] };
-function synthVocab(f){ const k=Object.keys(SYNTH_VOCAB).find(x=>x!=='_default'&&f.toLowerCase().includes(x)); return SYNTH_VOCAB[k]||SYNTH_VOCAB._default; }
-function synthValue(f,i,dims,dateField,days){
-  const lf=f.toLowerCase();
-  if(f===dateField || /(^|_)date$|event_date|session_date/.test(lf)) return days[i%days.length];
-  if(/(^|_)id$|^user$|^session/.test(lf)) return lf.includes('user') ? 'u'+(i%Math.max(8,Math.floor(days.length*2.4))) : f+'_'+i;
-  if(dims.has(f)){ const v=synthVocab(f); return v[i%v.length]; }
-  if(/page.?path|url|^path$/.test(lf)) return ['/','/pricing','/product','/blog','/docs','/about','/contact','/signup'][i%8];
-  if(/name$|title|campaign/.test(lf)) return synthVocab('platform')[i%5]+' · '+SYNTH_VOCAB.objective[i%3]+' '+(i+1);
-  if(/ctr|cvr|rate|roas|cpc|cpa|ratio|percent|pct/.test(lf)) return +(0.01+Math.abs(Math.sin(i*1.3+lf.length))*0.45).toFixed(4);
-  return Math.round(20+Math.abs(Math.sin(i*1.7+lf.length))*1500);   // generic positive metric
-}
-function synthForSource(id){
-  const {fields,dims,dateField}=synthFieldsForSource(id);
-  const ds=APP_CONFIG.dataSources[id]||{};
-  const campaignLike = ds.category==='ad' || fields.some(f=>/^(spend|impressions|clicks)$/i.test(f));
-  const days=synthDays(60);
-  const base = campaignLike ? synthRows(48) : Array.from({length:200},()=>({}));   // campaign keeps flights; others generic
-  return base.map((row,i)=>{
-    for(const f of fields){ if(!(f in row) || row[f]==null) row[f]=synthValue(f,i,dims,dateField,days); }
-    if(!('n' in row)) row.n=1;   // analytics charts often count rows via a metric named 'n'
-    if(dateField && dateField!=='_allTime' && !(dateField in row) && !('event_date' in row)) row[dateField]=days[i%days.length];
-    return row;
-  });
-}
-
 /* ══════════════════════════ TIME GRAIN (D/W/M/Q) ══════════════════════════ */
 // Each grain reshapes the date-range presets (grainPresets/resolveRange) AND re-buckets
 // time-series charts (dateBucketKey). W/M/Q default to the current period; D defaults to
@@ -1703,7 +1610,7 @@ function app(){
     appName:APP_CONFIG.title, appInitial:APP_CONFIG.appInitial, appLogo:APP_CONFIG.logo||'', askyLogo:ASKY_LOGO, askyCube:ASKY_CUBE,
     sections:APP_CONFIG.sections, slicers:APP_CONFIG.slicers, chatStarters:APP_CONFIG.chatStarters,
     section:APP_CONFIG.sections[0].id, sidebarOpen:true,
-    dataSource:'real', loading:false, error:null, freshness:'just now',
+    loading:false, error:null, freshness:'just now',
     range:{ preset:APP_CONFIG.dataSources.primary.defaultPreset||'last_30d', from:null, to:null },
     granularity:'D', hideDate:APP_CONFIG.hideDate||false,
     customRangeOpen:false, customFrom:'', customTo:'', crY:null, crM:null,   // crY/crM = the calendar month on view
@@ -1722,8 +1629,7 @@ function app(){
       bulk:{ status:'', budget:'', bid:'', daypart:'', negatives:'', freqcap:'' }, bulkFrom:null,
       cs:{ open:false, entityId:null, ctx:null, ctxLoading:false, genBusy:false, genErr:null, variants:null, sel:0, edited:{headline:'',primaryText:'',description:''}, phase:'edit', applyBusy:false, applyErr:null } },
     toasts:[], _tid:0, _rows:[], _sourceRows:{}, _charts:{}, _asOf:null,   // _asOf = latest date in the loaded data (2e); null ⇒ fall back to the system clock
-    _triedSynthFallback:false,   // auto-fallback to synthetic once when no live endpoint is reachable (no toggle)
-    _loadedRange:{}, _loadedMode:null, _asOfProbed:false,   // fetch cache: reuse rows unless the date window widens or the data mode changes (perf)
+    _loadedRange:{}, _asOfProbed:false,   // fetch cache: reuse rows unless the date window widens (perf)
     _asOfBySource:{},   // per-source latest date → drives the per-tab freshness badge
     chatOpen:false, chatMessages:[], chatInput:'', chatProcessing:false, chatStatus:'', chatInvestigationId:null, chatCursor:0,
 
@@ -1732,7 +1638,7 @@ function app(){
       this.widgets = safeGet('widgets', []);
       const h=location.hash.slice(1); if(h && this.sections.some(s=>s.id===h)) this.section=h;
       this.$watch('section', ()=>{ location.hash=this.section; this.recomputeSection(); });
-      this._sourceRows={}; for(const id of Object.keys(APP_CONFIG.dataSources)) this._sourceRows[id]=synthForSource(id);
+      this._sourceRows={};
       this._rows=this._sourceRows.primary||[];
       this.deriveSlicerValues();
       window.addEventListener('resize', ()=>Object.values(this._charts).forEach(c=>{ try{ c&&c.resize(); }catch(e){} }));
@@ -1745,11 +1651,10 @@ function app(){
       // field-presence guard: a slicer only sees rows that HAVE its field, so per-source slicers don't cross-bleed.
       for(const s of this.slicers){ if(s.field) this.slicerValues[s.id]=[...new Set(rows.filter(r=>s.field in r).map(r=>r[s.field]))].filter(v=>v!=null && v!==''); } },
 
-    /* ── Real vs Synthetic data source ──
-       'synthetic' = the built-in demo dataset (works offline, deterministic — for local preview/recording).
-       'real'      = live data from your Prism via the connection layer (getModelView). Deployed under your
-                     app slug it reads through the session cookie; from local preview there's no endpoint, so
-                     it surfaces an explanatory banner instead of silently showing fake numbers. */
+    /* ── Data source ──
+       Live data from your Prism via the connection layer (getModelView). Deployed under your app slug
+       it reads through the session cookie; run it locally against connections/dev-proxy.mjs. When no
+       endpoint is reachable it surfaces an explanatory banner rather than silently showing numbers. */
     // Fetch WHERE — DATE BOUNDS ONLY (perf). Categorical filters are applied CLIENT-SIDE in
     // rowsForSection, never pushed to the query — so toggling a filter never triggers a refetch (the
     // cached window already holds every category), and only widening the date window can force one.
@@ -1771,50 +1676,36 @@ function app(){
       // GENERIC MULTI-SOURCE LOADER — loads EVERY entry in APP_CONFIG.dataSources, both Prism tables
       // (kind:'prism', via getModelView) AND linked API gateways (kind:'rest', via the gw() proxy).
       // Rows are stored per source id in _sourceRows; _rows mirrors `primary` for back-compat.
-      // Idempotent both ways: synthetic ALWAYS regenerates, real ALWAYS refetches.
       const ids=Object.keys(APP_CONFIG.dataSources);
-      if(this.dataSource==='synthetic'){
-        this._sourceRows={}; for(const id of ids) this._sourceRows[id]=synthForSource(id);
-        this._rows=this._sourceRows.primary||[]; this.error=null; this.deriveSlicerValues();
-        this._asOf=this._computeAsOfFromRows(); this.freshness=this._freshnessLabel(); return;
-      }
       // 2e: resolve the data's as-of date FIRST, so the windowed WHERE below anchors to days the data
-      // actually has (a lagging snapshot + a clock-anchored window = zero rows). Probed ONCE per data
-      // mode — a snapshot's latest date doesn't move within a session, so we don't pay for it every reload.
+      // actually has (a lagging snapshot + a clock-anchored window = zero rows). Probed ONCE per
+      // session — a snapshot's latest date doesn't move within a session, so we don't pay for it every reload.
       if(!this._asOfProbed){ this._asOf=await this._probeAsOf(); this._asOfProbed=true; }
       // FAIL LOUD PER SOURCE: a failing source surfaces its own banner; the generic "no endpoint" banner
-      // shows only when nothing loads at all. Build into a LOCAL map first, commit only after the fallback
-      // decision — so a failing live fetch never wipes pre-seeded synthetic rows before the fallback runs.
+      // shows only when nothing loads at all.
       // PERF: sources load in PARALLEL, and each is SKIPPED when the cache already covers what's needed —
-      // same data mode + the loaded window already contains the needed window (filters are client-side, so
+      // the loaded window already contains the needed window (filters are client-side, so
       // only a wider date range forces a refetch). This makes filter toggles and date-narrowing instant.
       const fails=[]; const res={};
       await Promise.all(ids.map(async id=>{
         const ds=APP_CONFIG.dataSources[id];
         const need=this._loadRange(ds);
-        if(this.dataSource===this._loadedMode && this._sourceRows[id] && this._rangeCovers(this._loadedRange[id], need)){
+        if(this._sourceRows[id] && this._rangeCovers(this._loadedRange[id], need)){
           res[id]=this._sourceRows[id]; return;   // cache hit — no network
         }
         try{ res[id]=(await this.loadSource(id,ds))||[]; this._loadedRange[id]=need; }
         catch(e){ res[id]=[]; fails.push({src:ds.provider||id, e}); }
       }));
       const total=ids.reduce((n,id)=>n+(res[id]||[]).length,0);
-      // No data toggle anymore: when no live endpoint is reachable (local/offline preview), fall back to
-      // the built-in synthetic dataset ONCE so the app still renders instead of showing a dead banner.
-      // Deployed under its slug the live fetch succeeds and this never triggers. Return BEFORE committing
-      // res, so the recursive synthetic load owns _sourceRows outright.
-      if(!total && fails.length && !this._triedSynthFallback){
-        this._triedSynthFallback=true; this.dataSource='synthetic'; return await this.loadData();
-      }
-      this._sourceRows=res; this._loadedMode=this.dataSource;
+      this._sourceRows=res;
       this._rows=this._sourceRows.primary||[];
       this.deriveSlicerValues();
       // Fall back to the max date across loaded rows if no source could be probed (e.g. REST-only apps).
       this._asOf = this._asOf || this._computeAsOfFromRows();
       this.freshness=this._freshnessLabel();
-      if(!total && fails.length) this.error='No data endpoint reachable and synthetic fallback unavailable. Deploy under the app slug (cookie auth) or run connections/dev-proxy.mjs.';
+      if(!total && fails.length) this.error='No data endpoint reachable. Deploy under the app slug (cookie auth) or run connections/dev-proxy.mjs.';
       else if(fails.length) this.error=fails.map(f=>`${f.src} query failed: ${(f.e&&f.e.message)||'error'}`).join(' · ');
-      else if(!total) this.error='Real mode: queries returned no rows for the current filters.';
+      else if(!total) this.error='Queries returned no rows for the current filters.';
       else this.error=null;
     },
     // Load ONE source. Prism table → getModelView SELECT *; API gateway/REST → the gw() proxy via queryAny.
@@ -1830,21 +1721,12 @@ function app(){
       const sql=`SELECT * FROM ${escapeIdent(ds.prism)}${this.buildWhere(ds.dateCol, this._loadRange(ds))} LIMIT 5000`;
       return await queryModel(ds.prism, sql);
     },
-    // Single source of truth for the data mode. Flipping it drops ALL prior datasets + chat session and
-    // triggers a full reload, so Synthetic⇄Real is symmetric and idempotent (never a stale relabel).
-    async setDataMode(mode){
-      if(mode!=='real' && mode!=='synthetic') return;
-      this.dataSource=mode; this._rows=[]; this._sourceRows={}; this.chatInvestigationId=null; this.chatMessages=[]; this.error=null;
-      this._loadedRange={}; this._loadedMode=null; this._asOfProbed=false;   // drop the fetch cache — the new mode must refetch
-      await this.reloadAll();
-    },
 
     /* ── data load (per-section, resilient per-tile) ── */
     // Serialize every (re)load through one promise chain. Two reloads that overlap (double init, rapid
     // filter/tab clicks, a data-mode switch mid-fetch) would otherwise race on _sourceRows — a stale pass
     // could commit its empty result on top of a newer pass's rows. Chaining guarantees the newest load
-    // runs last and owns the final state. loadData()'s internal synthetic-fallback recursion is awaited
-    // inline (not re-chained), so it never deadlocks.
+    // runs last and owns the final state.
     _serialize(fn){ this._loadChain=(this._loadChain||Promise.resolve()).then(fn,fn); return this._loadChain; },
     async reloadAll(){ return this._serialize(async()=>{ this.loading=true;
       try{ await this.loadData(); for(const s of this.sections) await this.loadSection(s); this.$nextTick(()=>this.renderSection(this.currentSection())); }
@@ -2354,12 +2236,7 @@ function app(){
     // the operator confirms what happened NATIVELY in the platform — the app only records it
     optResolve(b,status){ if(b.status!=='platform_staged') return; b.status=status; b.resolvedAt=this.optNow();
       if(status==='live') this.toast('Live — the result will be checked against the forecast in 7 days'); else this.toast('Rejected — draft discarded in the platform'); },
-    // receipt half 2 — +7d scoring. Real mode: a scoring job fills it; synthetic mode: simulate button.
-    optScore(b){ if(b.status!=='live'||b.outcome) return;
-      const h=b.id.split('').reduce((a,c)=>a+c.charCodeAt(0),0)%4, v=['beat','met','partial_miss','miss'][h];
-      const fc=b.forecast?b.forecast.text:'the projection';
-      b.outcome={ verdict:v, scoredAt:this.optNow(), text:{ beat:'✓ beat forecast — '+fc, met:'✓ met forecast — '+fc,
-        partial_miss:'~ close — landed within 20% of the forecast', miss:'✗ missed — the result fell short of '+fc }[v] }; },
+    // receipt half 2 — +7d scoring: a scoring job fills the verdict at +7d.
     // a revert is a NEW staged change (inverse), never an in-place undo
     optRevertBatch(b){ const inv=b.changes.map(c=>({ ...c, id:'rev-'+c.id+'-'+(this.opt.seq), recId:null, before:c.after, after:c.before }));
       this.optNewBatch('manual','Revert — '+b.title, inv); this.opt.stagingOpen=true; this.toast('Revert queued in Pending changes — review & send like any other change'); },
@@ -2471,8 +2348,7 @@ function app(){
       else if(m=t.match(/pause\s+.*?(?:have|with)\s+(.+)/i)){ this.optConAct(this.optConMatch(act,m[1]),'status','PAUSED','matching “'+m[1].trim()+'”'); }
       // no quick-command match → hand the request to the Asky agent (same LLM as the chat panel &
       // creative studio). It can only DRAFT into the editor or ANSWER — it has no send/publish path.
-      else if(this.dataSource==='real'){ this.optConAgent(t); }
-      else { this.optConReply('Demo mode has no AI backend, so here I only understand quick commands: <b>pause … cost per result &gt; N</b> · <b>pause … that have X</b> · <b>change … that have X into paused</b> · <b>set budget +20% for X</b> · <b>why is X expensive</b>.<br>On the deployed app you can ask me anything in plain words.'); } },
+      else { this.optConAgent(t); } },
     /* ── LLM fallback (deployed app only): ask the Asky investigation agent for a STRUCTURED verdict —
        {"kind":"act", field, value, campaignIds, reply} → drafted into the Campaign editor (never sent), or
        {"kind":"answer", reply} → shown in the thread. Quick commands above stay the instant, free path. */
@@ -2571,9 +2447,6 @@ function app(){
     },
     csClose(){ this.opt.cs.open=false; },
     csOver(field,max){ return (this.opt.cs.edited[field]||'').length>max; },
-    async csSyntheticContext(e){ return { campaignId:e.id, adSetId:'demo_adset', format:'link', pageId:'demo_page', link:'https://example.com', imageHash:'demo',
-      headline:(e.name||'Your campaign')+' — Shop now', primaryText:'Discover '+(e.name||'our latest')+' picks, handpicked for you.', description:'Limited-time offers',
-      imageUrl:'https://picsum.photos/seed/'+encodeURIComponent(e.id)+'/240/140' }; },
     // No API connection → we cannot READ the live ad, so there's nothing to "refresh" from. We can still
     // GENERATE fresh copy, because generation runs on the Asky agent (our backend), not the ad platform.
     // Build the context from the campaign details we already have in Prism and flag that there's no current ad.
@@ -2582,7 +2455,6 @@ function app(){
       return { campaignId:e.id, adSetId:null, noCurrent:true, format:'link', headline:'', primaryText:'', description:'',
         seed:(theme||e.name||'this campaign') }; },
     async csLoadContext(e){
-      if(this.dataSource==='synthetic') return this.csSyntheticContext(e);
       if(!this.optSourceConnected(e.source)) return this.csDataContext(e);   // can't read the live ad without a connection
       const r=await gw('/'+e.id+'/ads', { fields:'adset_id,creative{object_story_spec,asset_feed_spec,image_url,title,body}', limit:8 });
       const ads=(r&&r.data)||[];
@@ -2599,18 +2471,12 @@ function app(){
     },
     async csGenerate(){
       const cs=this.opt.cs; if(!cs.ctx) return; cs.genBusy=true; cs.genErr=null;
-      try{ const v = this.dataSource==='synthetic' ? this.csCanned(cs.ctx) : await this.csAgentVariants(cs.ctx,3);
+      try{ const v = await this.csAgentVariants(cs.ctx,3);
         cs.variants=v; if(v[0]){ cs.sel=0; cs.edited={...v[0]}; } }
       catch(err){ cs.genErr=(err&&err.message)||String(err); }
       finally{ cs.genBusy=false; }
     },
     csPick(i){ const cs=this.opt.cs; cs.sel=i; if(cs.variants&&cs.variants[i]) cs.edited={...cs.variants[i]}; },
-    csCanned(ctx){ const base=(ctx.headline||'Your campaign').replace(/\s*[—-].*$/,'').trim();
-      return [
-        { headline:(base+' — finally here').slice(0,40), primaryText:('Meet '+base+'. The pick everyone is talking about — see why.').slice(0,125), description:'Shop the drop'.slice(0,30) },
-        { headline:('Don’t miss '+base).slice(0,40), primaryText:('Limited run of '+base+'. When it’s gone, it’s gone.').slice(0,125), description:'While stocks last'.slice(0,30) },
-        { headline:(base+', made simple').slice(0,40), primaryText:('Everything you love about '+base+', in one tap. Try it today.').slice(0,125), description:'Get started'.slice(0,30) },
-      ]; },
     async csAgentVariants(ctx,n){ n=n||3;
       // With a connection we refresh the CURRENT copy; without one we can't read it, so we generate fresh
       // copy from the campaign's details (its name/theme) instead.
@@ -2651,8 +2517,7 @@ function app(){
         // to the platform. A connected real account still missing the ad-account path falls back to hand-off
         // (copy + link) rather than erroring — we never claim we changed something we couldn't.
         let result;
-        if(this.dataSource==='real' && connected && cfg.accountPath){ await this.csLaunchRealAdSet(cs.ctx, cs.edited, label, cfg.accountPath); result='live'; }
-        else if(connected && this.dataSource==='synthetic'){ result='simulated'; }
+        if(connected && cfg.accountPath){ await this.csLaunchRealAdSet(cs.ctx, cs.edited, label, cfg.accountPath); result='live'; }
         else { result='manual'; }
         cs.result=result;
         // the result is a PAUSED ad set → platform_staged; go-live is flipped natively
@@ -3620,8 +3485,8 @@ function app(){
     /* ── Asky chat — grounded in this project's Prism via the Asky agent ──
        Same contract the Creative Studio uses: POST /<slug>/api/chat/start to open an investigation,
        /chat/respond for follow-ups in the same thread, and short-poll /chat/poll for streamed items.
-       Requires the DEPLOYED app (Mode-2 cookie auth) + Real data; in Synthetic mode there's no backend
-       to reach, so we say so plainly rather than fake an answer. */
+       Requires the DEPLOYED app (Mode-2 cookie auth). When no backend is reachable (e.g. local preview)
+       chat surfaces an error rather than a fabricated answer. */
     // New session: clear the in-app conversation + drop the Prism investigation so the next question opens
     // a fresh thread. Reset without refreshing. Any in-flight poll is abandoned (chatPoll bails when the
     // investigation id changes).
@@ -3629,11 +3494,6 @@ function app(){
     async chatSend(text){
       text=(text||'').trim(); if(!text || this.chatProcessing) return; this.chatInput='';
       this.chatMessages.push({role:'user',text}); this.chatProcessing=true; this.chatStatus='Thinking…';
-      if(this.dataSource==='synthetic'){
-        this.chatProcessing=false; this.chatStatus='';
-        this.chatMessages.push({role:'assistant',text:"I'm in Synthetic (demo) mode, so I can't reach your data. On the deployed app, switch the header toggle to “Real data” and I'll answer grounded in this project's Prism."});
-        return;
-      }
       try{
         if(!this.chatInvestigationId){
           // open an investigation/session on THIS project in Prism

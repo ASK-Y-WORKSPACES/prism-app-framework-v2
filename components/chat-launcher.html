@@ -6,7 +6,7 @@
   Auth note: works only in Mode 2 (deployed app, cookie auth). Hide entirely when Mode 1 / X-App-Token.
 -->
 <button @click="chatOpen = true"
-        x-show="!chatOpen && dataSource === 'real'"
+        x-show="!chatOpen"
         x-transition.opacity
         class="fixed bottom-4 right-4 z-30 flex items-center gap-2 pl-2 pr-4 py-2 rounded-full bg-[var(--surface-elevated)] border border-[var(--border)] shadow-lg hover:shadow-xl hover:border-[var(--primary)] transition-all group"
         aria-label="Open chat">

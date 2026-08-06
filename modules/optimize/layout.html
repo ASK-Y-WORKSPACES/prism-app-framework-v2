@@ -320,7 +320,6 @@
                           <template x-if="b.status==='platform_staged'"><span class="text-[var(--muted-foreground)]">starts once you approve go-live</span></template>
                           <template x-if="b.status==='live'&&!b.outcome">
                             <span class="text-[var(--muted-foreground)]">checked after 7 days
-                              <button x-show="dataSource==='synthetic'" @click.stop="optScore(b)" class="ml-1 text-[10px] px-1.5 py-0.5 rounded border border-[var(--border)] hover:border-[var(--primary)] hover:text-[var(--primary)]">simulate 7-day check</button>
                             </span>
                           </template>
                           <template x-if="b.outcome">

@@ -43,7 +43,6 @@ are same-origin.
 - **Mode 1 — Local dev: token-injecting proxy.** A browser on `localhost` has no
   cookie, so a tiny proxy (`dev-proxy.mjs`) injects `X-App-Token` from a
   gitignored `.env`. The token is **never** in client code or the deployed file.
-  Synthetic-mode preview needs neither cookie nor token.
 
 Single-file note: there is no Next.js `basePath`/static-export/rewrites here. The
 adaptation is simply: deploy under `/<slug>/`, call `apiBase()`, cookie in prod;
@@ -105,7 +104,7 @@ silently drops every gateway-only platform — the *"my Meta campaigns don't sho
 **Does *not* need to supply (production):** any secret/token — deployed apps
 authenticate via the same-origin cookie. The only extra, and only for previewing
 **real** data locally, is an `APP_TOKEN` in a gitignored `.env` consumed by
-`dev-proxy.mjs`. Synthetic preview and production deploy need nothing else.
+`dev-proxy.mjs`. Production deploy needs nothing else.
 
 ## 8. Checklist
 

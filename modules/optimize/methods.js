@@ -167,12 +167,7 @@
     // the operator confirms what happened NATIVELY in the platform — the app only records it
     optResolve(b,status){ if(b.status!=='platform_staged') return; b.status=status; b.resolvedAt=this.optNow();
       if(status==='live') this.toast('Live — the result will be checked against the forecast in 7 days'); else this.toast('Rejected — draft discarded in the platform'); },
-    // receipt half 2 — +7d scoring. Real mode: a scoring job fills it; synthetic mode: simulate button.
-    optScore(b){ if(b.status!=='live'||b.outcome) return;
-      const h=b.id.split('').reduce((a,c)=>a+c.charCodeAt(0),0)%4, v=['beat','met','partial_miss','miss'][h];
-      const fc=b.forecast?b.forecast.text:'the projection';
-      b.outcome={ verdict:v, scoredAt:this.optNow(), text:{ beat:'✓ beat forecast — '+fc, met:'✓ met forecast — '+fc,
-        partial_miss:'~ close — landed within 20% of the forecast', miss:'✗ missed — the result fell short of '+fc }[v] }; },
+    // receipt half 2 — +7d scoring: a scoring job fills the verdict at +7d.
     // a revert is a NEW staged change (inverse), never an in-place undo
     optRevertBatch(b){ const inv=b.changes.map(c=>({ ...c, id:'rev-'+c.id+'-'+(this.opt.seq), recId:null, before:c.after, after:c.before }));
       this.optNewBatch('manual','Revert — '+b.title, inv); this.opt.stagingOpen=true; this.toast('Revert queued in Pending changes — review & send like any other change'); },
@@ -284,8 +279,7 @@
       else if(m=t.match(/pause\s+.*?(?:have|with)\s+(.+)/i)){ this.optConAct(this.optConMatch(act,m[1]),'status','PAUSED','matching “'+m[1].trim()+'”'); }
       // no quick-command match → hand the request to the Asky agent (same LLM as the chat panel &
       // creative studio). It can only DRAFT into the editor or ANSWER — it has no send/publish path.
-      else if(this.dataSource==='real'){ this.optConAgent(t); }
-      else { this.optConReply('Demo mode has no AI backend, so here I only understand quick commands: <b>pause … cost per result &gt; N</b> · <b>pause … that have X</b> · <b>change … that have X into paused</b> · <b>set budget +20% for X</b> · <b>why is X expensive</b>.<br>On the deployed app you can ask me anything in plain words.'); } },
+      else { this.optConAgent(t); } },
     /* ── LLM fallback (deployed app only): ask the Asky investigation agent for a STRUCTURED verdict —
        {"kind":"act", field, value, campaignIds, reply} → drafted into the Campaign editor (never sent), or
        {"kind":"answer", reply} → shown in the thread. Quick commands above stay the instant, free path. */
@@ -384,9 +378,6 @@
     },
     csClose(){ this.opt.cs.open=false; },
     csOver(field,max){ return (this.opt.cs.edited[field]||'').length>max; },
-    async csSyntheticContext(e){ return { campaignId:e.id, adSetId:'demo_adset', format:'link', pageId:'demo_page', link:'https://example.com', imageHash:'demo',
-      headline:(e.name||'Your campaign')+' — Shop now', primaryText:'Discover '+(e.name||'our latest')+' picks, handpicked for you.', description:'Limited-time offers',
-      imageUrl:'https://picsum.photos/seed/'+encodeURIComponent(e.id)+'/240/140' }; },
     // No API connection → we cannot READ the live ad, so there's nothing to "refresh" from. We can still
     // GENERATE fresh copy, because generation runs on the Asky agent (our backend), not the ad platform.
     // Build the context from the campaign details we already have in Prism and flag that there's no current ad.
@@ -395,7 +386,6 @@
       return { campaignId:e.id, adSetId:null, noCurrent:true, format:'link', headline:'', primaryText:'', description:'',
         seed:(theme||e.name||'this campaign') }; },
     async csLoadContext(e){
-      if(this.dataSource==='synthetic') return this.csSyntheticContext(e);
       if(!this.optSourceConnected(e.source)) return this.csDataContext(e);   // can't read the live ad without a connection
       const r=await gw('/'+e.id+'/ads', { fields:'adset_id,creative{object_story_spec,asset_feed_spec,image_url,title,body}', limit:8 });
       const ads=(r&&r.data)||[];
@@ -412,18 +402,12 @@
     },
     async csGenerate(){
       const cs=this.opt.cs; if(!cs.ctx) return; cs.genBusy=true; cs.genErr=null;
-      try{ const v = this.dataSource==='synthetic' ? this.csCanned(cs.ctx) : await this.csAgentVariants(cs.ctx,3);
+      try{ const v = await this.csAgentVariants(cs.ctx,3);
         cs.variants=v; if(v[0]){ cs.sel=0; cs.edited={...v[0]}; } }
       catch(err){ cs.genErr=(err&&err.message)||String(err); }
       finally{ cs.genBusy=false; }
     },
     csPick(i){ const cs=this.opt.cs; cs.sel=i; if(cs.variants&&cs.variants[i]) cs.edited={...cs.variants[i]}; },
-    csCanned(ctx){ const base=(ctx.headline||'Your campaign').replace(/\s*[—-].*$/,'').trim();
-      return [
-        { headline:(base+' — finally here').slice(0,40), primaryText:('Meet '+base+'. The pick everyone is talking about — see why.').slice(0,125), description:'Shop the drop'.slice(0,30) },
-        { headline:('Don’t miss '+base).slice(0,40), primaryText:('Limited run of '+base+'. When it’s gone, it’s gone.').slice(0,125), description:'While stocks last'.slice(0,30) },
-        { headline:(base+', made simple').slice(0,40), primaryText:('Everything you love about '+base+', in one tap. Try it today.').slice(0,125), description:'Get started'.slice(0,30) },
-      ]; },
     async csAgentVariants(ctx,n){ n=n||3;
       // With a connection we refresh the CURRENT copy; without one we can't read it, so we generate fresh
       // copy from the campaign's details (its name/theme) instead.
@@ -464,8 +448,7 @@
         // to the platform. A connected real account still missing the ad-account path falls back to hand-off
         // (copy + link) rather than erroring — we never claim we changed something we couldn't.
         let result;
-        if(this.dataSource==='real' && connected && cfg.accountPath){ await this.csLaunchRealAdSet(cs.ctx, cs.edited, label, cfg.accountPath); result='live'; }
-        else if(connected && this.dataSource==='synthetic'){ result='simulated'; }
+        if(connected && cfg.accountPath){ await this.csLaunchRealAdSet(cs.ctx, cs.edited, label, cfg.accountPath); result='live'; }
         else { result='manual'; }
         cs.result=result;
         // the result is a PAUSED ad set → platform_staged; go-live is flipped natively

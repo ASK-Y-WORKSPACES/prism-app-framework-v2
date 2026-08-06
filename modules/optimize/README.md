@@ -55,12 +55,12 @@ LLM behind the chat panel and creative studio, via `/chat/start` + `/chat/poll` 
 only, Mode-2 cookie auth). The agent receives the campaign list and must return structured JSON:
 `{"kind":"act", field, value, campaignIds, reply}` → drafted into the Campaign editor exactly like
 a quick command (select + amber prefill — **never sent, never staged directly**), or
-`{"kind":"answer", reply}` → shown in the thread. In demo/synthetic mode only quick commands work
-(no backend); unmatched input explains that.
+`{"kind":"answer", reply}` → shown in the thread. When no backend is reachable (e.g. local preview)
+only quick commands work; unmatched input explains that.
 
 ## Creative studio (refresh ad copy → new paused ad set)
-Each row's **✨ Refresh** opens a modal to regenerate ad copy (Asky agent; canned variants in
-synthetic mode) and add it as a **new paused ad set** — inherently platform-staged, logged to
+Each row's **✨ Refresh** opens a modal to regenerate ad copy (Asky agent) and add it as a
+**new paused ad set** — inherently platform-staged, logged to
 Staging/History as a batch. Real writes need `optimize.creative.accountPath` (e.g. `'/act_123'`).
 
 ## Connection model — connected vs. not connected (IMPORTANT)
@@ -92,8 +92,8 @@ the max date in its raw rows (`optSrcFresh`), never a false "live".
   },
 }
 ```
-In synthetic mode the whole loop is demoable offline: stage → send → approve → LIVE → the
-`simulate +7d` control fills the receipt verdict.
+The whole loop works against connected platforms: stage → send → approve → LIVE → a scoring
+job fills the receipt verdict at +7d.
 
 ## Compose
 ```bash

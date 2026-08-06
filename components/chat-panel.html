@@ -5,7 +5,7 @@
     chatOpen, chatMessages[], chatInput, chatProcessing, chatInvestigationId, chatStarters[],
     plus methods chatSend(text), chatRetry(), chatCancel(), chatReset(), chatStarterClick(prompt).
   Backend contract: POST /api/chat/start → poll → respond → cancel (see project-spec.md ## Chat Endpoints).
-  Auth: Mode 2 (cookie) only. In Mode 1 / synthetic mode, show "Chat requires deployed mode" placeholder.
+  Auth: Mode 2 (cookie) only. In Mode 1, show "Chat requires deployed mode" placeholder.
 -->
 <aside x-show="chatOpen"
        x-transition:enter="transition ease-out duration-200"

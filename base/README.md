@@ -1,7 +1,7 @@
 # base/ — the foundation (runs standalone)
 
 `base/index.html` is a complete, working single-file app on its own. Open it in a
-browser (synthetic mode) to see it render. It contains:
+browser to see the chrome and every section render. It contains:
 
 - **Chrome** — sidebar, header, sticky filter bar, slicer panel, command palette, toasts, top progress.
 - **Core section layouts** — `kpi-grid`, `breakdown-grid`, `data-table`, `comparison`.

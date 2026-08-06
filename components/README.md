@@ -27,7 +27,7 @@ Drop-in HTML snippets, each module-agnostic — it expects certain Alpine state 
 | `context-menu.html` | Right-click menu (paste once near `</body>`) | `ctxMenu`, `addFilter`, `drill` |
 | `command-palette.html` | ⌘K palette (paste once near `</body>`) | `commandPaletteOpen`, `paletteItems()`, `paletteSelect()` |
 | `sortable-table.html` | Any section needing a sortable HTML table | self-contained `x-data` |
-| `chat-launcher.html` | Floating "ask me anything!" pill (paste once near `</body>`) | `chatOpen`, `dataSource` |
+| `chat-launcher.html` | Floating "ask me anything!" pill (paste once near `</body>`) | `chatOpen` |
 | `chat-panel.html` | Slide-in chat panel (paste once near `</body>`) | `chatOpen`, `chatMessages[]`, `chatInput`, `chatProcessing`, `chatStarters[]`, `chatSend()`, `chatStarterClick()` |
 
 ## How to use
